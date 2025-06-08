@@ -1,3 +1,3 @@
 [build]
-  publish = "public" # Thư mục chứa file frontend
-  functions = "netlify/functions" # Thư mục chứa các hàm serverless
+  publish = "public"
+  functions = "netlify/functions"
