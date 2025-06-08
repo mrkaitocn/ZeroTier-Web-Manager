@@ -1,4 +1,3 @@
 [build]
-  command = "" # Không cần lệnh build đặc biệt
   publish = "public" # Thư mục chứa file frontend
   functions = "netlify/functions" # Thư mục chứa các hàm serverless
