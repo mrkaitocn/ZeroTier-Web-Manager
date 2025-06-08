@@ -15,7 +15,6 @@ export default async (request) => {
     }
 
     try {
-        // Bước 1: Lấy danh sách thành viên từ ZeroTier như cũ
         const ztResponse = await fetch(`https://api.zerotier.com/api/v1/network/${networkId}/member`, {
             headers: { 'Authorization': `token ${ztToken}` },
         });
@@ -24,28 +23,29 @@ export default async (request) => {
         let membersFromZT = await ztResponse.json();
 
         if (membersFromZT.length === 0) {
-            return new Response(JSON.stringify([]), { status: 200 });
+            return new Response(JSON.stringify([]), { status: 200, headers: { 'Content-Type': 'application/json' } });
         }
 
-        // Bước 2: Lấy tất cả các key lịch sử từ Redis một lúc cho hiệu quả
         const memberIds = membersFromZT.map(m => m.nodeId);
         const stateKeys = memberIds.map(id => `zt-member-state:${id}`);
+        
+        // Sửa lỗi: Phải kiểm tra stateKeys có rỗng không
+        if (stateKeys.length === 0) {
+            return new Response(JSON.stringify(membersFromZT), { status: 200, headers: { 'Content-Type': 'application/json' } });
+        }
+
         const historyStatesRaw = await redis.mget(...stateKeys);
 
-        // Bước 3: Ghép dữ liệu lịch sử từ Redis vào danh sách thành viên
         const membersWithHistory = membersFromZT.map((member, index) => {
             const historyRaw = historyStatesRaw[index];
             let historyData = null;
             if (historyRaw) {
                 try {
-                    // Thử parse JSON
                     historyData = JSON.parse(historyRaw);
                 } catch(e) {
-                    // Nếu không được, gán trạng thái cũ
                     historyData = { status: historyRaw, timestamp: null };
                 }
             }
-            // Trả về object member đã được bổ sung trường 'history'
             return { ...member, history: historyData };
         });
 
@@ -55,6 +55,7 @@ export default async (request) => {
         });
 
     } catch (error) {
-        return new Response(JSON.stringify({ error: error.message }), { status: 500 });
+        console.error("Lỗi trong get-members.js:", error);
+        return new Response(JSON.stringify({ error: error.message }), { status: 500, headers: { 'Content-Type': 'application/json' } });
     }
 };
