@@ -1,14 +1,9 @@
-// ... (Hàm formatTimeAgo và các biến toàn cục giữ nguyên) ...
+// ... (Các hàm formatTimeAgo, các biến toàn cục, và hàm loadNetworks giữ nguyên) ...
 
 document.addEventListener('DOMContentLoaded', () => {
-    const memberList = document.getElementById('member-list');
-    const networkSelect = document.getElementById('network-select');
-    const memberHeader = document.getElementById('member-header');
-    const loading = document.getElementById('loading-indicator');
+    // ... (Các biến const và hàm showLoading, loadNetworks, toggleAuthorization giữ nguyên) ...
     
-    // ... (hàm showLoading, loadNetworks, toggleAuthorization giữ nguyên như phiên bản trước) ...
-    // ... Hãy đảm bảo chúng là phiên bản đã sửa lỗi logic ở các bước trước ...
-    
+    // === HÀM loadMembers ĐÃ ĐƯỢC CẬP NHẬT ĐỂ HIỂN THỊ LỊCH SỬ ===
     const loadMembers = async (networkId, isRefreshing = false) => {
         currentNetworkId = networkId;
         showLoading(true, isRefreshing);
@@ -17,6 +12,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         try {
+            // API get-members giờ đã trả về dữ liệu có cả 'history'
             const response = await fetch(`/.netlify/functions/get-members?networkId=${networkId}`);
             if (!response.ok) throw new Error(`Server responded with ${response.status}`);
             
@@ -31,14 +27,16 @@ document.addEventListener('DOMContentLoaded', () => {
                 members.sort((a, b) => (a.name || a.nodeId).localeCompare(b.name || b.nodeId));
                 members.forEach(member => {
                     const columnDiv = document.createElement('div');
-                    columnDiv.className = 'col-12 col-lg-6 mb-3'; // Thêm mb-3 để có khoảng cách
-                    
+                    columnDiv.className = 'col-12 col-lg-6';
+
+                    // Lấy dữ liệu từ object member
                     const name = member.name || 'Chưa đặt tên';
                     const ip = member.config.ipAssignments ? member.config.ipAssignments.join(', ') : 'Chưa có IP';
                     const authorizedStatus = member.config.authorized;
                     const lastSeen = member.lastSeen;
                     const physicalAddress = member.physicalAddress ? member.physicalAddress.split('/')[0] : 'N/A';
                     
+                    // Lấy và xử lý dữ liệu lịch sử mới
                     const history = member.history;
                     let historyHtml = '<p class="card-text mb-2"><small class="text-secondary">Chưa có dữ liệu lịch sử.</small></p>';
                     if (history && history.timestamp) {
@@ -50,6 +48,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         }
                     }
 
+                    // Tạo nội dung HTML với thông tin lịch sử
                     columnDiv.innerHTML = `
                         <div class="card h-100">
                             <div class="card-body d-flex flex-column justify-content-between">
@@ -76,6 +75,7 @@ document.addEventListener('DOMContentLoaded', () => {
             
             const refreshTime = 5 * 60 * 1000;
             refreshIntervalId = setInterval(() => {
+                console.log(`Tự động làm mới danh sách thành viên lúc ${new Date().toLocaleTimeString('vi-VN')}`);
                 loadMembers(currentNetworkId, true);
             }, refreshTime);
             
@@ -87,6 +87,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     };
     
-    // ... (Các hàm và event listener khác)
+    // ... (các hàm toggleAuthorization, và các event listener giữ nguyên) ...
+
     loadNetworks();
 });
