@@ -1,3 +1,8 @@
+# netlify.toml
+
 [build]
+  # Thư mục chứa file frontend (HTML, CSS, JS) để hiển thị cho người dùng.
   publish = "public"
+
+  # Thư mục chứa các hàm serverless (backend API) của bạn.
   functions = "netlify/functions"
