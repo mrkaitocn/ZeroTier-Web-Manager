@@ -1,15 +1,7 @@
 {
-  "name": "zerotier-web-manager",
+  "name": "zerotier-netlify-manager",
   "version": "1.0.0",
-  "description": "A web app to manage ZeroTier networks",
-  "main": "index.js",
-  "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
-  },
-  "keywords": [
-    "zerotier",
-    "api"
-  ],
+  "description": "A web app to manage ZeroTier networks on Netlify",
   "author": "",
   "license": "ISC"
 }
