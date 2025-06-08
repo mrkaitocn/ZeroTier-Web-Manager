@@ -3,5 +3,8 @@
   "version": "1.0.0",
   "description": "A web app to manage ZeroTier networks on Netlify",
   "author": "",
-  "license": "ISC"
+  "license": "ISC",
+  "dependencies": {
+    "@upstash/redis": "^1.31.5"
+  }
 }
