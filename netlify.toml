@@ -1,8 +1,8 @@
-# netlify.toml
-
 [build]
-  # Thư mục chứa file frontend (HTML, CSS, JS) để hiển thị cho người dùng.
   publish = "public"
-
-  # Thư mục chứa các hàm serverless (backend API) của bạn.
   functions = "netlify/functions"
+
+# Thêm khối này để lên lịch chạy cho function 'check-devices'
+[functions."check-devices"]
+  # Cú pháp cron: chạy mỗi 5 phút
+  schedule = "*/5 * * * *"
