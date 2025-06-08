@@ -4,7 +4,7 @@ export default async (request) => {
   const ZT_TOKEN = process.env.ZT_TOKEN;
 
   if (!networkId) {
-    return new Response(JSON.stringify({ error: 'Network ID is required' }), { statusCode: 400 });
+    return new Response(JSON.stringify({ error: 'Network ID is required' }), { status: 400 });
   }
 
   try {
@@ -15,11 +15,8 @@ export default async (request) => {
     if (!apiResponse.ok) throw new Error(`ZeroTier API responded with ${apiResponse.status}`);
 
     const members = await apiResponse.json();
-    return new Response(JSON.stringify(members), {
-      statusCode: 200,
-      headers: { 'Content-Type': 'application/json' },
-    });
+    return new Response(JSON.stringify(members), { status: 200, headers: { 'Content-Type': 'application/json' } });
   } catch (error) {
-    return new Response(JSON.stringify({ error: error.message }), { statusCode: 500 });
+    return new Response(JSON.stringify({ error: error.message }), { status: 500 });
   }
 };
