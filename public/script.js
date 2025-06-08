@@ -31,11 +31,8 @@ function formatTimeAgo(timestamp) {
 }
 
 // === BIẾN TOÀN CỤC ĐỂ QUẢN LÝ TRẠNG THÁI ===
-// Lưu lại ID của network đang được chọn để refresh
 let currentNetworkId = null; 
-// Lưu lại ID của lịch trình setInterval để có thể xóa khi cần
 let refreshIntervalId = null;
-
 
 document.addEventListener('DOMContentLoaded', () => {
     const networkSelect = document.getElementById('network-select');
@@ -44,7 +41,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const loading = document.getElementById('loading-indicator');
 
     const showLoading = (isLoading, isRefreshing = false) => {
-        // Nếu chỉ là refresh, không hiển thị icon loading lớn
         if (!isRefreshing) {
             loading.style.display = isLoading ? 'block' : 'none';
         }
@@ -54,57 +50,62 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     };
 
-    // === CẬP NHẬT HÀM loadNetworks ĐỂ TỰ ĐỘNG CHỌN ===
+    // === HÀM loadNetworks ĐÃ ĐƯỢC SỬA LỖI LOGIC ===
     const loadNetworks = async () => {
         showLoading(true);
         networkSelect.disabled = true;
+        let networks = []; // Khởi tạo mảng networks
+
         try {
             const response = await fetch('/.netlify/functions/get-networks');
-            if (!response.ok) throw new Error(`Server responded with ${response.status}`);
+            if (!response.ok) {
+                // Nếu fetch lỗi, ném ra lỗi để nhảy vào khối catch
+                throw new Error(`Server responded with ${response.status}`);
+            }
             
-            const networks = await response.json();
+            networks = await response.json();
 
-            // KIỂM TRA NẾU CHỈ CÓ 1 NETWORK
             if (networks.length === 1) {
                 const singleNetwork = networks[0];
-                // Thêm network đó vào dropdown và chọn sẵn
                 const option = document.createElement('option');
                 option.value = singleNetwork.id;
-                option.textContent = `<span class="math-inline">\{singleNetwork\.config\.name \|\| 'Unnamed Network'\} \(</span>{singleNetwork.id})`;
+                option.textContent = `${singleNetwork.config.name || 'Unnamed Network'} (${singleNetwork.id})`;
+                networkSelect.innerHTML = ''; // Xóa các lựa chọn cũ
                 networkSelect.appendChild(option);
                 networkSelect.value = singleNetwork.id;
 
-                // Ẩn label và dropdown đi cho gọn
                 document.querySelector('label[for="network-select"]').style.display = 'none';
                 networkSelect.style.display = 'none';
 
-                // TỰ ĐỘNG TẢI THÀNH VIÊN NGAY LẬP TỨC
                 loadMembers(singleNetwork.id);
             } else {
-                // Nếu có nhiều hơn 1 network, hoạt động như cũ
+                // Áp dụng cho 0 hoặc nhiều hơn 1 network
                 networkSelect.innerHTML = '<option selected disabled>Chọn một network...</option>';
                 networks.forEach(net => {
                     const option = document.createElement('option');
                     option.value = net.id;
-                    option.textContent = `<span class="math-inline">\{net\.config\.name \|\| 'Unnamed Network'\} \(</span>{net.id})`;
+                    option.textContent = `${net.config.name || 'Unnamed Network'} (${net.id})`;
                     networkSelect.appendChild(option);
                 });
-                networkSelect.disabled = false;
             }
         } catch (error) {
             console.error('Error loading networks:', error);
-            alert('Failed to load networks. Vui lòng kiểm tra lại Console (F12) để xem chi tiết lỗi.');
+            alert('Không thể tải danh sách network. Vui lòng kiểm tra Console (F12) và thử tải lại trang.');
+            // Nếu có lỗi, đảm bảo dropdown trống và có placeholder
+             networkSelect.innerHTML = '<option selected disabled>Không thể tải network...</option>';
+        } finally {
+            // DÙ THÀNH CÔNG HAY THẤT BẠI, KHỐI NÀY LUÔN CHẠY
+            showLoading(false);
+            // Luôn kích hoạt lại dropdown nếu không phải trường hợp chỉ có 1 network
+            if (networks.length !== 1) {
+                networkSelect.disabled = false;
+            }
         }
-        showLoading(false);
     };
 
-    // === CẬP NHẬT HÀM loadMembers ĐỂ TỰ ĐỘNG REFRESH ===
     const loadMembers = async (networkId, isRefreshing = false) => {
-        // Lưu lại ID của network hiện tại
         currentNetworkId = networkId;
         showLoading(true, isRefreshing);
-
-        // Mỗi lần load, hủy lịch trình refresh cũ (nếu có)
         if (refreshIntervalId) {
             clearInterval(refreshIntervalId);
         }
@@ -130,40 +131,63 @@ document.addEventListener('DOMContentLoaded', () => {
                     const authorizedStatus = member.config.authorized;
                     const lastSeen = member.lastSeen;
                     const physicalAddress = member.physicalAddress ? member.physicalAddress.split('/')[0] : 'N/A';
-
                     li.innerHTML = `
-                        <div class="me-3 mb-2">
-                            <strong><span class="math-inline">\{name\}</strong\><br\>
-<small class\="text\-muted"\></span>{member.nodeId}</small><br>
-                            <small>IP ảo: ${ip}</small><br>
-                            <small class="text-info">Physical IP: ${physicalAddress}</small><br>
-                            <small class="text-success">Last Seen: <span class="math-inline">\{formatTimeAgo\(lastSeen\)\}</small\>
-</div\>
-<div class\="d\-flex align\-items\-center"\>
-<span class\="me\-3 authorized\-</span>{authorizedStatus}">${authorizedStatus ? 'Đã duyệt' : 'Chưa duyệt'}</span>
-                            <button class="btn btn-sm <span class="math-inline">\{authorizedStatus ? 'btn\-outline\-danger' \: 'btn\-outline\-success'\}" data\-member\-id\="</span>{member.nodeId}" data-authorize="${!authorizedStatus}">
-                                ${authorizedStatus ? 'Hủy duyệt' : 'Duyệt'}
-                            </button>
-                        </div>
+                        <div class="me-3 mb-2"><strong>${name}</strong><br><small class="text-muted">${member.nodeId}</small><br><small>IP ảo: ${ip}</small><br><small class="text-info">Physical IP: ${physicalAddress}</small><br><small class="text-success">Last Seen: ${formatTimeAgo(lastSeen)}</small></div>
+                        <div class="d-flex align-items-center"><span class="me-3 authorized-${authorizedStatus}">${authorizedStatus ? 'Đã duyệt' : 'Chưa duyệt'}</span><button class="btn btn-sm ${authorizedStatus ? 'btn-outline-danger' : 'btn-outline-success'}" data-member-id="${member.nodeId}" data-authorize="${!authorizedStatus}">${authorizedStatus ? 'Hủy duyệt' : 'Duyệt'}</button></div>
                     `;
                     memberList.appendChild(li);
                 });
             }
             
-            // SAU KHI LOAD THÀNH CÔNG, LÊN LỊCH REFRESH MỚI SAU 5 PHÚT
-            const refreshTime = 5 * 60 * 1000; // 5 phút
+            const refreshTime = 5 * 60 * 1000;
             refreshIntervalId = setInterval(() => {
                 console.log(`Tự động làm mới danh sách thành viên lúc ${new Date().toLocaleTimeString('vi-VN')}`);
-                loadMembers(currentNetworkId, true); // Gọi lại chính nó với cờ isRefreshing = true
+                loadMembers(currentNetworkId, true);
             }, refreshTime);
             
         } catch (error) {
             console.error('Error loading members:', error);
-            // Nếu có lỗi, dừng việc tự động refresh để tránh lặp lại lỗi
             if (refreshIntervalId) clearInterval(refreshIntervalId);
         } finally {
             showLoading(false, isRefreshing);
         }
     };
 
-    const toggleAuthorization = async (networkId, memberId
+    const toggleAuthorization = async (networkId, memberId, shouldAuthorize) => {
+        const button = document.querySelector(`button[data-member-id='${memberId}']`);
+        button.disabled = true;
+        button.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>';
+        try {
+            const response = await fetch('/.netlify/functions/authorize-member', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ networkId, memberId, authorize: shouldAuthorize }),
+            });
+            if (!response.ok) throw new Error('Failed to update member status.');
+            await loadMembers(networkId);
+        } catch (error) {
+            console.error('Error updating member:', error);
+            alert('Failed to update member.');
+            button.disabled = false;
+        }
+    };
+
+    networkSelect.addEventListener('change', () => {
+        const networkId = networkSelect.value;
+        if (networkId && !networkSelect.options[networkSelect.selectedIndex].disabled) {
+            loadMembers(networkId);
+        }
+    });
+
+    memberList.addEventListener('click', (event) => {
+        const button = event.target.closest('button');
+        if (button) {
+            const memberId = button.dataset.memberId;
+            const shouldAuthorize = button.dataset.authorize === 'true';
+            const networkId = currentNetworkId; // Luôn lấy network ID hiện tại
+            toggleAuthorization(networkId, memberId, shouldAuthorize);
+        }
+    });
+
+    loadNetworks();
+});
