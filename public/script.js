@@ -1,3 +1,38 @@
+// === HÀM HỖ TRỢ ĐỊNH DẠNG THỜI GIAN ===
+// Hàm này sẽ chuyển timestamp thành chuỗi dạng "X phút trước", "Y giờ trước", v.v.
+function formatTimeAgo(timestamp) {
+    if (!timestamp || timestamp === 0) {
+        return 'Chưa bao giờ';
+    }
+
+    const now = new Date();
+    const seenTime = new Date(timestamp);
+    const seconds = Math.floor((now - seenTime) / 1000);
+
+    let interval = seconds / 31536000; // Số giây trong 1 năm
+    if (interval > 1) {
+        return seenTime.toLocaleDateString('vi-VN'); // Nếu hơn 1 năm, hiển thị ngày cụ thể
+    }
+    interval = seconds / 2592000; // Số giây trong 1 tháng
+    if (interval > 1) {
+        return Math.floor(interval) + " tháng trước";
+    }
+    interval = seconds / 86400; // Số giây trong 1 ngày
+    if (interval > 1) {
+        return Math.floor(interval) + " ngày trước";
+    }
+    interval = seconds / 3600; // Số giây trong 1 giờ
+    if (interval > 1) {
+        return Math.floor(interval) + " giờ trước";
+    }
+    interval = seconds / 60; // Số giây trong 1 phút
+    if (interval > 1) {
+        return Math.floor(interval) + " phút trước";
+    }
+    return "Vài giây trước";
+}
+
+
 document.addEventListener('DOMContentLoaded', () => {
     const networkSelect = document.getElementById('network-select');
     const memberList = document.getElementById('member-list');
@@ -16,7 +51,6 @@ document.addEventListener('DOMContentLoaded', () => {
         showLoading(true);
         networkSelect.disabled = true;
         try {
-            // Đường dẫn API chuẩn của Netlify
             const response = await fetch('/.netlify/functions/get-networks');
             if (!response.ok) {
                 throw new Error(`Server responded with ${response.status}`);
@@ -38,17 +72,17 @@ document.addEventListener('DOMContentLoaded', () => {
         showLoading(false);
     };
 
+    // === HÀM loadMembers ĐÃ ĐƯỢC CẬP NHẬT ===
     const loadMembers = async (networkId) => {
         showLoading(true);
         try {
-            // Đường dẫn API chuẩn của Netlify
             const response = await fetch(`/.netlify/functions/get-members?networkId=${networkId}`);
             if (!response.ok) {
                 throw new Error(`Server responded with ${response.status}`);
             }
             const members = await response.json();
             
-            memberList.innerHTML = ''; // Xóa danh sách cũ
+            memberList.innerHTML = ''; 
             memberHeader.style.display = 'block';
 
             if (members.length === 0) {
@@ -62,17 +96,26 @@ document.addEventListener('DOMContentLoaded', () => {
                 const li = document.createElement('li');
                 li.className = 'list-group-item d-flex justify-content-between align-items-center flex-wrap';
 
+                // Lấy thêm dữ liệu mới
                 const name = member.name || 'Chưa đặt tên';
                 const ip = member.config.ipAssignments ? member.config.ipAssignments.join(', ') : 'Chưa có IP';
                 const authorizedStatus = member.config.authorized;
-                
+                const lastSeen = member.lastSeen;
+                // API trả về địa chỉ dạng "ip/port", chúng ta chỉ lấy phần IP
+                const physicalAddress = member.physicalAddress ? member.physicalAddress.split('/')[0] : 'N/A';
+
+                // Cập nhật lại cấu trúc HTML để hiển thị thông tin mới
                 li.innerHTML = `
                     <div class="me-3 mb-2">
                         <strong>${name}</strong>
                         <br>
                         <small class="text-muted">${member.nodeId}</small>
                         <br>
-                        <small>IP: ${ip}</small>
+                        <small>IP ảo: ${ip}</small>
+                        <br>
+                        <small class="text-info">Physical IP: ${physicalAddress}</small>
+                        <br>
+                        <small class="text-success">Last Seen: ${formatTimeAgo(lastSeen)}</small>
                     </div>
                     <div class="d-flex align-items-center">
                          <span class="me-3 authorized-${authorizedStatus}">${authorizedStatus ? 'Đã duyệt' : 'Chưa duyệt'}</span>
@@ -91,6 +134,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         showLoading(false);
     };
+    // === KẾT THÚC CẬP NHẬT hàm loadMembers ===
 
     const toggleAuthorization = async (networkId, memberId, shouldAuthorize) => {
         const button = document.querySelector(`button[data-member-id='${memberId}']`);
@@ -109,13 +153,12 @@ document.addEventListener('DOMContentLoaded', () => {
             });
             if (!response.ok) throw new Error('Failed to update member status.');
 
-            // Tải lại danh sách thành viên để cập nhật giao diện
             await loadMembers(networkId);
 
         } catch (error) {
             console.error('Error updating member:', error);
             alert('Failed to update member.');
-            button.disabled = false; // Bật lại nút nếu có lỗi
+            button.disabled = false;
         }
     };
 
@@ -130,13 +173,12 @@ document.addEventListener('DOMContentLoaded', () => {
         const button = event.target.closest('button');
         if (button) {
             const memberId = button.dataset.memberId;
-            const shouldAuthorize = button.dataset.authorize === 'true'; // Chuyển chuỗi thành boolean
+            const shouldAuthorize = button.dataset.authorize === 'true';
             const networkId = networkSelect.value;
             
             toggleAuthorization(networkId, memberId, shouldAuthorize);
         }
     });
 
-    // Bắt đầu tải danh sách networks khi trang được mở
     loadNetworks();
 });
