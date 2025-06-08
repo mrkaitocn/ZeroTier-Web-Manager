@@ -1,13 +1,13 @@
 export default async (request) => {
   if (request.method !== 'POST') {
-    return new Response(JSON.stringify({ error: 'Method Not Allowed' }), { status: 405 });
+    return new Response(JSON.stringify({ error: 'Method Not Allowed' }), { statusCode: 405 });
   }
 
   const { networkId, memberId, authorize } = await request.json();
   const ZT_TOKEN = process.env.ZT_TOKEN;
 
   if (!networkId || !memberId || typeof authorize !== 'boolean') {
-    return new Response(JSON.stringify({ error: 'Missing required fields' }), { status: 400 });
+    return new Response(JSON.stringify({ error: 'Missing required fields' }), { statusCode: 400 });
   }
 
   try {
@@ -23,8 +23,11 @@ export default async (request) => {
     if (!apiResponse.ok) throw new Error(`ZeroTier API responded with ${apiResponse.status}`);
     
     const updatedMember = await apiResponse.json();
-    return new Response(JSON.stringify(updatedMember), { status: 200, headers: { 'Content-Type': 'application/json' } });
+    return new Response(JSON.stringify(updatedMember), {
+      statusCode: 200,
+      headers: { 'Content-Type': 'application/json' },
+    });
   } catch (error) {
-    return new Response(JSON.stringify({ error: error.message }), { status: 500 });
+    return new Response(JSON.stringify({ error: error.message }), { statusCode: 500 });
   }
 };
