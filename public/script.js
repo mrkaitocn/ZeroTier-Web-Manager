@@ -4,63 +4,84 @@ document.addEventListener('DOMContentLoaded', () => {
     const memberHeader = document.getElementById('member-header');
     const loading = document.getElementById('loading-indicator');
 
-    // Show/hide loading indicator
     const showLoading = (isLoading) => {
         loading.style.display = isLoading ? 'block' : 'none';
+        if (isLoading) {
+            memberHeader.style.display = 'none';
+            memberList.innerHTML = '';
+        }
     };
 
-    // Fetch and display networks
     const loadNetworks = async () => {
         showLoading(true);
+        networkSelect.disabled = true;
         try {
-            const response = await fetch('/api/get-networks');
+            // Đường dẫn API chuẩn của Netlify
+            const response = await fetch('/.netlify/functions/get-networks');
+            if (!response.ok) {
+                throw new Error(`Server responded with ${response.status}`);
+            }
             const networks = await response.json();
 
-            networkSelect.innerHTML = '<option selected disabled>Choose a network...</option>';
+            networkSelect.innerHTML = '<option selected disabled>Chọn một network...</option>';
             networks.forEach(net => {
                 const option = document.createElement('option');
                 option.value = net.id;
-                option.textContent = `${net.config.name} (${net.id})`;
+                option.textContent = `${net.config.name || 'Unnamed Network'} (${net.id})`;
                 networkSelect.appendChild(option);
             });
+            networkSelect.disabled = false;
         } catch (error) {
             console.error('Error loading networks:', error);
-            alert('Failed to load networks.');
+            alert('Failed to load networks. Vui lòng kiểm tra lại Console (F12) để xem chi tiết lỗi.');
         }
         showLoading(false);
     };
 
-    // Fetch and display members for a selected network
     const loadMembers = async (networkId) => {
         showLoading(true);
-        memberList.innerHTML = '';
-        memberHeader.style.display = 'block';
-
         try {
-            const response = await fetch(`/api/get-members?networkId=${networkId}`);
+            // Đường dẫn API chuẩn của Netlify
+            const response = await fetch(`/.netlify/functions/get-members?networkId=${networkId}`);
+            if (!response.ok) {
+                throw new Error(`Server responded with ${response.status}`);
+            }
             const members = await response.json();
+            
+            memberList.innerHTML = ''; // Xóa danh sách cũ
+            memberHeader.style.display = 'block';
 
             if (members.length === 0) {
-                memberList.innerHTML = '<li class="list-group-item">No members found in this network.</li>';
+                memberList.innerHTML = '<li class="list-group-item">Không có thành viên nào trong network này.</li>';
+                return;
             }
+
+            members.sort((a, b) => (a.name || a.nodeId).localeCompare(b.name || b.nodeId));
 
             members.forEach(member => {
                 const li = document.createElement('li');
-                li.className = 'list-group-item d-flex justify-content-between align-items-center';
+                li.className = 'list-group-item d-flex justify-content-between align-items-center flex-wrap';
 
-                const name = member.name || 'N/A';
-                const ip = member.config.ipAssignments ? member.config.ipAssignments.join(', ') : 'No IP';
+                const name = member.name || 'Chưa đặt tên';
+                const ip = member.config.ipAssignments ? member.config.ipAssignments.join(', ') : 'Chưa có IP';
+                const authorizedStatus = member.config.authorized;
                 
                 li.innerHTML = `
-                    <div>
-                        <strong>${name}</strong> (${member.nodeId})<br>
+                    <div class="me-3 mb-2">
+                        <strong>${name}</strong>
+                        <br>
+                        <small class="text-muted">${member.nodeId}</small>
+                        <br>
                         <small>IP: ${ip}</small>
                     </div>
-                    <button class="btn ${member.config.authorized ? 'btn-danger' : 'btn-success'}" 
-                            data-member-id="${member.nodeId}" 
-                            data-authorized="${member.config.authorized}">
-                        ${member.config.authorized ? 'Deauthorize' : 'Authorize'}
-                    </button>
+                    <div class="d-flex align-items-center">
+                         <span class="me-3 authorized-${authorizedStatus}">${authorizedStatus ? 'Đã duyệt' : 'Chưa duyệt'}</span>
+                        <button class="btn btn-sm ${authorizedStatus ? 'btn-outline-danger' : 'btn-outline-success'}" 
+                                data-member-id="${member.nodeId}" 
+                                data-authorize="${!authorizedStatus}">
+                            ${authorizedStatus ? 'Hủy duyệt' : 'Duyệt'}
+                        </button>
+                    </div>
                 `;
                 memberList.appendChild(li);
             });
@@ -71,11 +92,13 @@ document.addEventListener('DOMContentLoaded', () => {
         showLoading(false);
     };
 
-    // Authorize or deauthorize a member
     const toggleAuthorization = async (networkId, memberId, shouldAuthorize) => {
-        showLoading(true);
+        const button = document.querySelector(`button[data-member-id='${memberId}']`);
+        button.disabled = true;
+        button.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>';
+
         try {
-            const response = await fetch('/api/authorize-member', {
+            const response = await fetch('/.netlify/functions/authorize-member', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -84,39 +107,36 @@ document.addEventListener('DOMContentLoaded', () => {
                     authorize: shouldAuthorize,
                 }),
             });
-
             if (!response.ok) throw new Error('Failed to update member status.');
 
-            // Refresh the member list to show the change
+            // Tải lại danh sách thành viên để cập nhật giao diện
             await loadMembers(networkId);
 
         } catch (error) {
             console.error('Error updating member:', error);
             alert('Failed to update member.');
-            showLoading(false);
+            button.disabled = false; // Bật lại nút nếu có lỗi
         }
     };
 
-    // Event Listeners
     networkSelect.addEventListener('change', () => {
         const networkId = networkSelect.value;
-        if (networkId) {
+        if (networkId && networkId !== 'Chọn một network...') {
             loadMembers(networkId);
         }
     });
 
     memberList.addEventListener('click', (event) => {
-        if (event.target.tagName === 'BUTTON') {
-            const button = event.target;
+        const button = event.target.closest('button');
+        if (button) {
             const memberId = button.dataset.memberId;
-            const isAuthorized = button.dataset.authorized === 'true';
+            const shouldAuthorize = button.dataset.authorize === 'true'; // Chuyển chuỗi thành boolean
             const networkId = networkSelect.value;
             
-            // The action is the opposite of the current state
-            toggleAuthorization(networkId, memberId, !isAuthorized);
+            toggleAuthorization(networkId, memberId, shouldAuthorize);
         }
     });
 
-    // Initial load
+    // Bắt đầu tải danh sách networks khi trang được mở
     loadNetworks();
 });
