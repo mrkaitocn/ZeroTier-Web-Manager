@@ -1,18 +1,18 @@
-import { getStore } from '@netlify/blobs';
-
 export default async (request) => {
-    if (request.method !== 'POST') {
-        return new Response('Method Not Allowed', { status: 405 });
-    }
+    if (request.method !== 'POST') return new Response('Method Not Allowed', { status: 405 });
 
     const { networkId, memberId, authorize } = await request.json();
-    const ZT_TOKEN = process.env.ZT_TOKEN;
+    const { ZT_TOKEN, JSONBIN_API_KEY, JSONBIN_BIN_ID } = process.env;
 
-    if (!networkId || !memberId || typeof authorize !== 'boolean') {
-        return new Response('Missing required fields', { status: 400 });
+    if (!networkId || !memberId || typeof authorize !== 'boolean' || !JSONBIN_API_KEY || !JSONBIN_BIN_ID) {
+        return new Response('Missing required fields or environment variables', { status: 400 });
     }
 
+    const JSONBIN_URL = `https://api.jsonbin.io/v3/b/${JSONBIN_BIN_ID}`;
+    const headers = { 'X-Master-Key': JSONBIN_API_KEY, 'Content-Type': 'application/json' };
+
     try {
+        // Luôn thực hiện hành động duyệt trước
         const apiResponse = await fetch(`https://api.zerotier.com/api/v1/network/${networkId}/member/${memberId}`, {
             method: 'POST',
             headers: { 'Authorization': `token ${ZT_TOKEN}`, 'Content-Type': 'application/json' },
@@ -20,23 +20,26 @@ export default async (request) => {
         });
         if (!apiResponse.ok) throw new Error(`ZeroTier API responded with ${apiResponse.status}`);
         
-        const unauthorizedStore = getStore('notified_unauthorized');
-        const onlineStatusStore = getStore('online_status');
+        // Sau khi duyệt thành công, cập nhật lại trạng thái trong JSONBin
+        const stateResponse = await fetch(`${JSONBIN_URL}/latest`, { headers: { 'X-Master-Key': JSONBIN_API_KEY } });
+        if (!stateResponse.ok) throw new Error('Could not fetch state from JSONBin to update.');
+        const state = await stateResponse.json();
+        let currentState = state.record;
 
         if (authorize) {
-            await unauthorizedStore.delete(memberId);
-            console.log(`Cleaned up ${memberId} from unauthorized notifications store.`);
+            delete currentState.notified_unauthorized[memberId];
         } else {
-            await onlineStatusStore.delete(memberId);
-            console.log(`Cleaned up ${memberId} from online status store.`);
+            delete currentState.online_status[memberId];
         }
         
-        const updatedMember = await apiResponse.json();
-        return new Response(JSON.stringify(updatedMember), {
-            statusCode: 200,
-            headers: { 'Content-Type': 'application/json' },
+        await fetch(JSONBIN_URL, {
+            method: 'PUT',
+            headers: headers,
+            body: JSON.stringify(currentState)
         });
-
+        
+        const updatedMember = await apiResponse.json();
+        return new Response(JSON.stringify(updatedMember), { statusCode: 200, headers: { 'Content-Type': 'application/json' } });
     } catch (error) {
         console.error('Error in authorize-member:', error);
         return new Response('Internal Server Error', { status: 500 });
