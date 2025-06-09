@@ -6,6 +6,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const memberHeader = document.getElementById('member-header');
     const loading = document.getElementById('loading-indicator');
 
+    // === THAY ĐỔI 1: Khai báo biến để lưu ID của bộ đếm thời gian ===
+    let refreshIntervalId = null;
+
     const showLoading = (isLoading) => { loading.style.display = isLoading ? 'block' : 'none'; if (isLoading) { memberHeader.style.display = 'none'; memberList.innerHTML = ''; } };
 
     const loadNetworks = async () => {
@@ -34,8 +37,12 @@ document.addEventListener('DOMContentLoaded', () => {
         showLoading(false);
     };
 
-    const loadMembers = async (networkId) => {
-        showLoading(true);
+    const loadMembers = async (networkId, isBackgroundRefresh = false) => {
+        // Nếu không phải là làm mới dưới nền, hiển thị loading
+        if (!isBackgroundRefresh) {
+            showLoading(true);
+        }
+        
         try {
             const response = await fetch(`/.netlify/functions/get-members?networkId=${networkId}`);
             if (!response.ok) throw new Error(`Server responded with ${response.status}`);
@@ -52,31 +59,21 @@ document.addEventListener('DOMContentLoaded', () => {
             members.forEach(member => {
                 const li = document.createElement('li');
                 li.className = 'list-group-item';
-
                 const name = member.name || 'Chưa đặt tên';
                 const ip = member.config.ipAssignments ? member.config.ipAssignments.join(', ') : 'Chưa có IP';
                 const authorizedStatus = member.config.authorized;
                 const lastSeen = member.lastSeen;
                 const physicalAddress = member.physicalAddress ? member.physicalAddress.split('/')[0] : 'N/A';
-                
                 const location = member.location;
                 let locationString = 'Không rõ vị trí';
                 if (location && location.city) {
                     locationString = `${location.city}, ${location.country}`;
                 }
-                
-                // === THAY ĐỔI CHÍNH BẮT ĐẦU TỪ ĐÂY ===
-                // 1. Lấy thông tin 'org' thay vì 'asn'
                 const org = location ? location.org : null;
                 let providerString = 'Không rõ';
                 if (org) {
-                    // Chuỗi org thường có dạng "AS7552 FPT Telecom Company"
-                    // Chúng ta có thể lấy toàn bộ hoặc chỉ lấy tên
-                    providerString = org; 
+                    providerString = org;
                 }
-                // === KẾT THÚC THAY ĐỔI LOGIC ===
-
-                // 2. Cập nhật HTML để hiển thị "Nhà cung cấp"
                 li.innerHTML = `
                     <div class="d-flex justify-content-between align-items-start flex-wrap">
                         <div class="me-3 mb-2">
@@ -100,8 +97,12 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         } catch (error) {
             console.error('Error loading members:', error);
-            alert('Failed to load members.');
+            // Chỉ thông báo lỗi khi người dùng chủ động tải, không thông báo khi làm mới dưới nền
+            if (!isBackgroundRefresh) {
+                alert('Failed to load members.');
+            }
         }
+        // Luôn tắt loading sau khi hoàn tất
         showLoading(false);
     };
 
@@ -111,7 +112,8 @@ document.addEventListener('DOMContentLoaded', () => {
         button.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
         try {
             await fetch('/.netlify/functions/authorize-member', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ networkId, memberId, authorize: shouldAuthorize }) });
-            await loadMembers(networkId);
+            // Sau khi duyệt, tải lại danh sách ngay lập tức
+            await loadMembers(networkId); 
         } catch (error) {
             console.error('Error updating member:', error);
             alert('Failed to update member.');
@@ -119,11 +121,29 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     };
 
+    // === THAY ĐỔI 2: Cập nhật sự kiện 'change' của network select ===
     networkSelect.addEventListener('change', () => {
         const networkId = networkSelect.value;
-        if (networkId && networkId !== 'Chọn một network...') {
-            loadMembers(networkId);
+        if (!networkId || networkId === 'Chọn một network...') return;
+
+        // Tải danh sách thành viên ngay lập tức khi chọn
+        loadMembers(networkId);
+
+        // Xóa bộ đếm cũ trước khi bắt đầu cái mới để tránh chạy nhiều lần
+        if (refreshIntervalId) {
+            clearInterval(refreshIntervalId);
+            console.log('Đã dừng bộ đếm thời gian làm mới cũ.');
         }
+
+        // Bắt đầu một bộ đếm mới để tự động làm mới sau mỗi 5 phút (300,000 mili giây)
+        const refreshInterval = 5 * 60 * 1000;
+        refreshIntervalId = setInterval(() => {
+            console.log(`Tự động làm mới danh sách thành viên lúc ${new Date().toLocaleTimeString('vi-VN')}`);
+            // Gọi hàm loadMembers với tham số thứ hai là true để chỉ định đây là làm mới dưới nền
+            loadMembers(networkId, true);
+        }, refreshInterval);
+        
+        console.log(`Đã bắt đầu tự động làm mới sau mỗi 5 phút cho network ${networkId}.`);
     });
 
     memberList.addEventListener('click', (event) => {
