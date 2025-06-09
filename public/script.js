@@ -15,7 +15,6 @@ document.addEventListener('DOMContentLoaded', () => {
             const response = await fetch('/.netlify/functions/get-networks');
             if (!response.ok) throw new Error(`Server responded with ${response.status}`);
             const networks = await response.json();
-
             networkSelect.innerHTML = '<option selected disabled>Chọn một network...</option>';
             networks.forEach(net => {
                 const option = document.createElement('option');
@@ -24,11 +23,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 networkSelect.appendChild(option);
             });
             networkSelect.disabled = false;
-
-            // === TÍNH NĂNG MỚI: TỰ ĐỘNG CHỌN NẾU CHỈ CÓ 1 NETWORK ===
             if (networks.length === 1) {
-                networkSelect.selectedIndex = 1; // Chọn network đầu tiên
-                networkSelect.dispatchEvent(new Event('change')); // Giả lập sự kiện 'change' để tải members
+                networkSelect.selectedIndex = 1;
+                networkSelect.dispatchEvent(new Event('change'));
             }
         } catch (error) {
             console.error('Error loading networks:', error);
@@ -54,7 +51,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             members.forEach(member => {
                 const li = document.createElement('li');
-                li.className = 'list-group-item'; // CSS Grid sẽ xử lý phần còn lại
+                li.className = 'list-group-item';
 
                 const name = member.name || 'Chưa đặt tên';
                 const ip = member.config.ipAssignments ? member.config.ipAssignments.join(', ') : 'Chưa có IP';
@@ -67,13 +64,19 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (location && location.city) {
                     locationString = `${location.city}, ${location.country}`;
                 }
-                // === TÍNH NĂNG MỚI: LẤY THÔNG TIN ASN ===
-                const asn = location ? location.asn : null;
-                let asnString = 'Không rõ';
-                if (asn && asn.name) {
-                    asnString = `${asn.asn} - ${asn.name}`;
+                
+                // === THAY ĐỔI CHÍNH BẮT ĐẦU TỪ ĐÂY ===
+                // 1. Lấy thông tin 'org' thay vì 'asn'
+                const org = location ? location.org : null;
+                let providerString = 'Không rõ';
+                if (org) {
+                    // Chuỗi org thường có dạng "AS7552 FPT Telecom Company"
+                    // Chúng ta có thể lấy toàn bộ hoặc chỉ lấy tên
+                    providerString = org; 
                 }
+                // === KẾT THÚC THAY ĐỔI LOGIC ===
 
+                // 2. Cập nhật HTML để hiển thị "Nhà cung cấp"
                 li.innerHTML = `
                     <div class="d-flex justify-content-between align-items-start flex-wrap">
                         <div class="me-3 mb-2">
@@ -82,7 +85,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             <br><small>IP ảo: ${ip}</small>
                             <br><small class="text-info">Physical IP: ${physicalAddress}</small>
                             <br><small class="text-primary">📍 Vị trí: ${locationString}</small>
-                            <br><small class="text-secondary">🏢 ASN: ${asnString}</small>
+                            <br><small class="text-secondary">🏢 Nhà cung cấp: ${providerString}</small>
                             <br><small class="text-success">Last Seen: ${formatTimeAgo(lastSeen)}</small>
                         </div>
                         <div class="d-flex align-items-center">
