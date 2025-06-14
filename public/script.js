@@ -1,4 +1,4 @@
-// public/script.js - Phiên bản sửa lỗi "Đặt tên & Duyệt"
+// public/script.js - Phiên bản sửa lỗi trắng trang
 
 function formatTimeAgo(timestamp) { if (!timestamp || timestamp === 0) return 'Chưa bao giờ'; const now = new Date(); const seenTime = new Date(timestamp); const seconds = Math.floor((now - seenTime) / 1000); if (seconds < 60) return "Vài giây trước"; const minutes = Math.floor(seconds / 60); if (minutes < 60) return `${minutes} phút trước`; const hours = Math.floor(minutes / 60); if (hours < 24) return `${hours} giờ trước`; const days = Math.floor(hours / 24); if (days < 30) return `${days} ngày trước`; return seenTime.toLocaleDateString('vi-VN'); }
 
@@ -21,7 +21,7 @@ document.addEventListener('DOMContentLoaded', () => {
             networks.forEach(net => {
                 const option = document.createElement('option');
                 option.value = net.id;
-                option.textContent = `<span class="math-inline">\{net\.config\.name \|\| 'Unnamed Network'\} \(</span>{net.id})`;
+                option.textContent = `${net.config.name || 'Unnamed Network'} (${net.id})`;
                 networkSelect.appendChild(option);
             });
             networkSelect.disabled = false;
@@ -43,12 +43,15 @@ document.addEventListener('DOMContentLoaded', () => {
             memberHeader.style.display = 'block';
             if (members.length === 0) { memberList.innerHTML = '<li class="list-group-item">Không có thành viên nào trong network này.</li>'; return; }
             members.sort((a, b) => (a.name || a.nodeId).localeCompare(b.name || b.nodeId));
+
             members.forEach(member => {
                 const li = document.createElement('li');
                 li.className = 'list-group-item';
                 li.id = `member-${member.id}`;
-                // ... (phần code gán các biến name, ip, v.v... giữ nguyên)
+
                 const name = member.name || 'Chưa đặt tên';
+                // Xử lý ký tự đặc biệt trong tên để tránh lỗi HTML
+                const escapedName = name.replace(/"/g, '&quot;');
                 const ip = member.config.ipAssignments ? member.config.ipAssignments.join(', ') : 'Chưa có IP';
                 const authorizedStatus = member.config.authorized;
                 const lastSeen = member.lastSeen;
@@ -59,22 +62,33 @@ document.addEventListener('DOMContentLoaded', () => {
                 const asn = location ? location.asn : null;
                 let asnString = 'Không rõ';
                 if (asn && asn.name) asnString = `${asn.asn} - ${asn.name}`;
-                // ... (phần innerHTML giữ nguyên)
+
                 li.innerHTML = `
                     <div class="d-flex justify-content-between align-items-start flex-wrap">
                         <div class="me-3 mb-2 flex-grow-1">
-                            <div class="view-mode-item"><strong><span class="math-inline">\{name\}</strong\><button class\="btn btn\-link btn\-sm p\-0 ms\-2" data\-action\="edit\-name" title\="Sửa tên"\>✏️</button\></div\>
-<div class\="edit\-mode\-item" style\="display\:none;"\><input type\="text" class\="form\-control form\-control\-sm" value\="</span>{name}" placeholder="Nhập tên gợi nhớ..."></div>
+                            <div class="view-mode-item">
+                                <strong>${name}</strong>
+                                <button class="btn btn-link btn-sm p-0 ms-2" data-action="edit-name" title="Sửa tên">✏️</button>
+                            </div>
+                            <div class="edit-mode-item">
+                                <input type="text" class="form-control form-control-sm edit-name-input" value="${escapedName}" placeholder="Nhập tên gợi nhớ...">
+                            </div>
                             <small class="text-muted d-block">${member.id}</small>
-                            <div class="mt-2"><small>IP ảo: ${ip}</small><br><small class="text-info">Physical IP: ${physicalAddress}</small><br><small class="text-primary">📍 Vị trí: ${locationString}</small><br><small class="text-secondary">🏢 ASN: ${asnString}</small><br><small class="text-success">Last Seen: ${formatTimeAgo(lastSeen)}</small></div>
+                            <div class="mt-2">
+                                <small>IP ảo: ${ip}</small><br>
+                                <small class="text-info">Physical IP: ${physicalAddress}</small><br>
+                                <small class="text-primary">📍 Vị trí: ${locationString}</small><br>
+                                <small class="text-secondary">🏢 ASN: ${asnString}</small><br>
+                                <small class="text-success">Last Seen: ${formatTimeAgo(lastSeen)}</small>
+                            </div>
                         </div>
                         <div class="d-flex align-items-center mt-2">
                             ${!authorizedStatus ? `<div class="me-2"><input type="text" class="form-control form-control-sm new-member-name-input" placeholder="Đặt tên & Duyệt"></div>` : ''}
-                            <span class="me-3 authorized-<span class="math-inline">\{authorizedStatus\}"\></span>{authorizedStatus ? 'Đã duyệt' : 'Chưa duyệt'}</span>
+                            <span class="me-3 authorized-${authorizedStatus}">${authorizedStatus ? 'Đã duyệt' : 'Chưa duyệt'}</span>
                             <div class="view-mode-item">
-                                <button class="btn btn-sm <span class="math-inline">\{authorizedStatus ? 'btn\-outline\-danger' \: 'btn\-outline\-success'\}" data\-action\="authorize" data\-authorize\="</span>{!authorizedStatus}">${authorizedStatus ? 'Hủy duyệt' : 'Duyệt'}</button>
+                                <button class="btn btn-sm ${authorizedStatus ? 'btn-outline-danger' : 'btn-outline-success'}" data-action="authorize" data-authorize="${!authorizedStatus}">${authorizedStatus ? 'Hủy duyệt' : 'Duyệt'}</button>
                             </div>
-                            <div class="edit-mode-item" style="display:none;">
+                            <div class="edit-mode-item">
                                 <button class="btn btn-sm btn-success" data-action="save-name">💾 Lưu</button>
                                 <button class="btn btn-sm btn-secondary ms-1" data-action="cancel-edit">Hủy</button>
                             </div>
@@ -91,10 +105,7 @@ document.addEventListener('DOMContentLoaded', () => {
         memberElement.style.opacity = '0.5';
         try {
             const response = await fetch('/.netlify/functions/authorize-member', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ networkId, memberId, ...payload }) });
-            if (!response.ok) {
-                const errorText = await response.text();
-                throw new Error(errorText || 'Cập nhật thất bại');
-            }
+            if (!response.ok) { const errorText = await response.text(); throw new Error(errorText || 'Cập nhật thất bại'); }
             await loadMembers(networkId);
         } catch (error) {
             console.error('Error updating member:', error);
@@ -107,13 +118,10 @@ document.addEventListener('DOMContentLoaded', () => {
         const memberElement = document.getElementById(`member-${memberId}`);
         const viewItems = memberElement.querySelectorAll('.view-mode-item');
         const editItems = memberElement.querySelectorAll('.edit-mode-item');
+        viewItems.forEach(el => el.style.display = isEditing ? 'none' : '');
+        editItems.forEach(el => el.style.display = isEditing ? '' : 'none');
         if (isEditing) {
-            viewItems.forEach(el => el.style.display = 'none');
-            editItems.forEach(el => el.style.display = 'inline-block');
-            memberElement.querySelector('.edit-mode-item input[type="text"]').focus();
-        } else {
-            editItems.forEach(el => el.style.display = 'none');
-            viewItems.forEach(el => el.style.display = 'inline-block');
+            memberElement.querySelector('.edit-name-input').focus();
         }
     };
 
@@ -128,4 +136,27 @@ document.addEventListener('DOMContentLoaded', () => {
 
         switch (action) {
             case 'authorize': {
-                const shouldAuthorize = button.dataset.
+                const shouldAuthorize = button.dataset.authorize === 'true';
+                let payload = { authorize: shouldAuthorize };
+                if (shouldAuthorize) {
+                    const nameInput = listItem.querySelector('.new-member-name-input');
+                    if (nameInput && nameInput.value.trim() !== '') {
+                        payload.name = nameInput.value.trim();
+                    }
+                }
+                updateMember(networkId, memberId, payload);
+                break;
+            }
+            case 'edit-name': toggleEditMode(memberId, true); break;
+            case 'save-name': {
+                const nameInput = listItem.querySelector('.edit-name-input');
+                updateMember(networkId, memberId, { name: nameInput.value.trim() });
+                break;
+            }
+            case 'cancel-edit': toggleEditMode(memberId, false); break;
+        }
+    });
+    
+    networkSelect.addEventListener('change', () => { if(networkSelect.value) loadMembers(networkSelect.value); });
+    loadNetworks();
+});
