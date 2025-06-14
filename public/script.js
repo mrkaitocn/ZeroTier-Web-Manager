@@ -1,4 +1,4 @@
-// public/script.js - Phiên bản cuối cùng, sửa lỗi đọc ASN
+// public/script.js - Phiên bản v1.0 ỔN ĐỊNH
 
 function formatTimeAgo(timestamp) { if (!timestamp || timestamp === 0) return 'Chưa bao giờ'; const now = new Date(); const seenTime = new Date(timestamp); const seconds = Math.floor((now - seenTime) / 1000); if (seconds < 60) return "Vài giây trước"; const minutes = Math.floor(seconds / 60); if (minutes < 60) return `${minutes} phút trước`; const hours = Math.floor(minutes / 60); if (hours < 24) return `${hours} giờ trước`; const days = Math.floor(hours / 24); if (days < 30) return `${days} ngày trước`; return seenTime.toLocaleDateString('vi-VN'); }
 
@@ -21,7 +21,7 @@ document.addEventListener('DOMContentLoaded', () => {
             networks.forEach(net => {
                 const option = document.createElement('option');
                 option.value = net.id;
-                option.textContent = `<span class="math-inline">\{net\.config\.name \|\| 'Unnamed Network'\} \(</span>{net.id})`;
+                option.textContent = `${net.config.name || 'Unnamed Network'} (${net.id})`;
                 networkSelect.appendChild(option);
             });
             networkSelect.disabled = false;
@@ -48,7 +48,7 @@ document.addEventListener('DOMContentLoaded', () => {
             members.forEach(member => {
                 const li = document.createElement('li');
                 li.className = 'list-group-item';
-                li.id = `member-${member.nodeId}`;
+                li.id = `member-${member.nodeId}`; // Sử dụng nodeId đã sửa lỗi 404
 
                 const name = member.name || 'Chưa đặt tên';
                 const escapedName = name.replace(/"/g, '&quot;');
@@ -56,24 +56,21 @@ document.addEventListener('DOMContentLoaded', () => {
                 const authorizedStatus = member.config.authorized;
                 const lastSeen = member.lastSeen;
                 const physicalAddress = member.physicalAddress ? member.physicalAddress.split('/')[0] : 'N/A';
-                
                 const location = member.location;
                 let locationString = 'Không rõ vị trí';
                 if (location && location.city) locationString = `${location.city}, ${location.country}`;
                 
-                // === PHẦN SỬA LỖI QUAN TRỌNG NẰM Ở ĐÂY ===
+                 // Logic xử lý ASN đã được sửa lại để đọc đúng trường "org"
                 let asnString = 'Không rõ';
-                // Đọc trực tiếp từ trường "org" thay vì "asn"
                 if (location && location.org) {
                     asnString = location.org;
                 }
-                // ==========================================
 
                 li.innerHTML = `
                     <div class="d-flex justify-content-between align-items-start flex-wrap">
                         <div class="me-3 mb-2 flex-grow-1">
-                            <div class="view-mode-item"><strong><span class="math-inline">\{name\}</strong\><button class\="btn btn\-link btn\-sm p\-0 ms\-2" data\-action\="edit\-name" title\="Sửa tên"\>✏️</button\></div\>
-<div class\="edit\-mode\-item" style\="display\:none;"\><input type\="text" class\="form\-control form\-control\-sm edit\-name\-input" value\="</span>{escapedName}" placeholder="Nhập tên gợi nhớ..."></div>
+                            <div class="view-mode-item"><strong>${name}</strong><button class="btn btn-link btn-sm p-0 ms-2" data-action="edit-name" title="Sửa tên">✏️</button></div>
+                            <div class="edit-mode-item" style="display:none;"><input type="text" class="form-control form-control-sm edit-name-input" value="${escapedName}" placeholder="Nhập tên gợi nhớ..."></div>
                             <small class="text-muted d-block">${member.nodeId}</small>
                             <div class="mt-2">
                                 <small>IP ảo: ${ip}</small><br>
@@ -84,4 +81,80 @@ document.addEventListener('DOMContentLoaded', () => {
                             </div>
                         </div>
                         <div class="d-flex align-items-center mt-2">
-                            ${!authorizedStatus ? `<div class="me-2"><input type="text" class="form-control form-control-sm new-member-name-input" placeholder
+                             ${!authorizedStatus ? `<div class="me-2"><input type="text" class="form-control form-control-sm new-member-name-input" placeholder="Đặt tên & Duyệt"></div>` : ''}
+                            <span class="me-3 authorized-${authorizedStatus}">${authorizedStatus ? 'Đã duyệt' : 'Chưa duyệt'}</span>
+                            <div class="view-mode-item">
+                                <button class="btn btn-sm ${authorizedStatus ? 'btn-outline-danger' : 'btn-outline-success'}" data-action="authorize" data-authorize="${!authorizedStatus}">${authorizedStatus ? 'Hủy duyệt' : 'Duyệt'}</button>
+                            </div>
+                            <div class="edit-mode-item" style="display:none;">
+                                <button class="btn btn-sm btn-success" data-action="save-name">💾 Lưu</button>
+                                <button class="btn btn-sm btn-secondary ms-1" data-action="cancel-edit">Hủy</button>
+                            </div>
+                        </div>
+                    </div>`;
+                memberList.appendChild(li);
+            });
+        } catch (error) { console.error('Error loading members:', error); alert('Failed to load members.'); }
+        showLoading(false);
+    };
+
+    const updateMember = async (networkId, memberId, payload) => {
+        const memberElement = document.getElementById(`member-${memberId}`);
+        memberElement.style.opacity = '0.5';
+        try {
+            const response = await fetch('/.netlify/functions/authorize-member', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ networkId, memberId, ...payload }) });
+            if (!response.ok) { const errorText = await response.text(); throw new Error(errorText || 'Cập nhật thất bại'); }
+            await loadMembers(networkId);
+        } catch (error) {
+            console.error('Error updating member:', error);
+            alert(`Lỗi: ${error.message}`);
+            memberElement.style.opacity = '1';
+        }
+    };
+    
+    const toggleEditMode = (memberId, isEditing) => {
+        const memberElement = document.getElementById(`member-${memberId}`);
+        const viewItems = memberElement.querySelectorAll('.view-mode-item');
+        const editItems = memberElement.querySelectorAll('.edit-mode-item');
+        viewItems.forEach(el => el.style.display = isEditing ? 'none' : '');
+        editItems.forEach(el => el.style.display = isEditing ? '' : 'none');
+        if (isEditing) {
+            memberElement.querySelector('.edit-name-input').focus();
+        }
+    };
+
+    memberList.addEventListener('click', (event) => {
+        const button = event.target.closest('button');
+        if (!button) return;
+
+        const listItem = button.closest('.list-group-item');
+        const memberId = listItem.id.replace('member-', '');
+        const networkId = networkSelect.value;
+        const action = button.dataset.action;
+
+        switch (action) {
+            case 'authorize': {
+                const shouldAuthorize = button.dataset.authorize === 'true';
+                let payload = { authorize: shouldAuthorize };
+                if (shouldAuthorize) {
+                    const nameInput = listItem.querySelector('.new-member-name-input');
+                    if (nameInput && nameInput.value.trim() !== '') {
+                        payload.name = nameInput.value.trim();
+                    }
+                }
+                updateMember(networkId, memberId, payload);
+                break;
+            }
+            case 'edit-name': toggleEditMode(memberId, true); break;
+            case 'save-name': {
+                const nameInput = listItem.querySelector('.edit-name-input');
+                updateMember(networkId, memberId, { name: nameInput.value.trim() });
+                break;
+            }
+            case 'cancel-edit': toggleEditMode(memberId, false); break;
+        }
+    });
+    
+    networkSelect.addEventListener('change', () => { if(networkSelect.value) loadMembers(networkSelect.value); });
+    loadNetworks();
+});
