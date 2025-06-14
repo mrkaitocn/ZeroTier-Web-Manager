@@ -1,32 +1,56 @@
 export default async (request) => {
     if (request.method !== 'POST') return new Response('Method Not Allowed', { status: 405 });
 
-    const { networkId, memberId, authorize, name, description } = await request.json();
-    const { ZT_TOKEN, JSONBIN_API_KEY, JSONBIN_BIN_ID } = process.env;
-
-    if (!networkId || !memberId || !JSONBIN_API_KEY || !JSONBIN_BIN_ID) {
-        return new Response('Missing required fields or environment variables', { status: 400 });
-    }
-
     try {
-        // --- 1. Xây dựng payload động cho API của ZeroTier ---
-        const ztPayload = {};
-        if (typeof name !== 'undefined') ztPayload.name = name;
-        if (typeof description !== 'undefined') ztPayload.description = description;
-        if (typeof authorize === 'boolean') ztPayload.config = { authorized: authorize };
-        if (Object.keys(ztPayload).length === 0) return new Response('No update data provided', { status: 400 });
+        const body = await request.json();
+        const { networkId, memberId, authorize, name } = body;
+        const { ZT_TOKEN, JSONBIN_API_KEY, JSONBIN_BIN_ID } = process.env;
 
-        // --- 2. Gửi yêu cầu cập nhật lên ZeroTier ---
+        if (!networkId || !memberId) {
+            return new Response('Missing networkId or memberId', { status: 400 });
+        }
+        
+        console.log('Received payload from frontend:', body);
+
+        // --- Xây dựng payload động cho API của ZeroTier ---
+        const ztPayload = {};
+        
+        // Luôn lấy thông tin hiện tại để không ghi đè các trường khác
+        const currentMemberResponse = await fetch(`https://api.zerotier.com/api/v1/network/${networkId}/member/${memberId}`, {
+            headers: { 'Authorization': `token ${ZT_TOKEN}` }
+        });
+        if (!currentMemberResponse.ok) throw new Error('Could not fetch current member details from ZeroTier.');
+        const currentMember = await currentMemberResponse.json();
+        
+        // Gán các giá trị hiện tại vào payload
+        ztPayload.name = currentMember.name;
+        ztPayload.description = currentMember.description;
+        ztPayload.config = currentMember.config;
+
+        // Cập nhật payload với dữ liệu mới từ frontend
+        if (typeof name !== 'undefined') {
+            ztPayload.name = name;
+        }
+        if (typeof authorize === 'boolean') {
+            // Đảm bảo không làm mất các cài đặt config khác
+            ztPayload.config = { ...ztPayload.config, authorized: authorize };
+        }
+        
+        console.log('Constructed payload for ZeroTier API:', ztPayload);
+
+        // --- Gửi yêu cầu cập nhật lên ZeroTier ---
         const apiResponse = await fetch(`https://api.zerotier.com/api/v1/network/${networkId}/member/${memberId}`, {
             method: 'POST',
             headers: { 'Authorization': `token ${ZT_TOKEN}`, 'Content-Type': 'application/json' },
             body: JSON.stringify(ztPayload),
         });
-        if (!apiResponse.ok) throw new Error(`ZeroTier API responded with ${apiResponse.status}`);
+        if (!apiResponse.ok) {
+            const errorText = await apiResponse.text();
+            throw new Error(`ZeroTier API responded with ${apiResponse.status}: ${errorText}`);
+        }
 
-        // --- 3. Dọn dẹp "sổ ghi nhớ" trong JSONBin.io ---
-        // Chỉ thực hiện khi có hành động liên quan đến 'authorize'
-        if (typeof authorize === 'boolean') {
+        // --- Dọn dẹp "sổ ghi nhớ" trong JSONBin.io (nếu có hành động duyệt) ---
+        if (typeof authorize === 'boolean' && JSONBIN_API_KEY && JSONBIN_BIN_ID) {
             const JSONBIN_URL = `https://api.jsonbin.io/v3/b/${JSONBIN_BIN_ID}`;
             const headers = { 'X-Master-Key': JSONBIN_API_KEY, 'Content-Type': 'application/json' };
 
@@ -35,23 +59,16 @@ export default async (request) => {
                 const state = await stateResponse.json();
                 let currentState = state.record;
                 let stateChanged = false;
-
-                if (authorize) { // Nếu hành động là DUYỆT
-                    if (currentState.notified_unauthorized[memberId]) {
-                        delete currentState.notified_unauthorized[memberId];
-                        stateChanged = true;
-                        console.log(`Cleaned up ${memberId} from unauthorized notifications store.`);
-                    }
-                } else { // Nếu hành động là HỦY DUYỆT
-                    if (currentState.online_status[memberId]) {
-                        delete currentState.online_status[memberId];
-                        stateChanged = true;
-                        console.log(`Cleaned up ${memberId} from online status store.`);
-                    }
+                if (authorize && currentState.notified_unauthorized[memberId]) {
+                    delete currentState.notified_unauthorized[memberId];
+                    stateChanged = true;
+                } else if (!authorize && currentState.online_status[memberId]) {
+                    delete currentState.online_status[memberId];
+                    stateChanged = true;
                 }
-
                 if (stateChanged) {
                     await fetch(JSONBIN_URL, { method: 'PUT', headers: headers, body: JSON.stringify(currentState) });
+                    console.log(`JSONBin state updated for member ${memberId}.`);
                 }
             }
         }
