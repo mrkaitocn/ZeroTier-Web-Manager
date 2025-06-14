@@ -1,5 +1,4 @@
-// public/script.js - Phiên bản sửa lỗi trắng trang
-
+// public/script.js - Phiên bản cuối cùng, sửa lỗi 404
 function formatTimeAgo(timestamp) { if (!timestamp || timestamp === 0) return 'Chưa bao giờ'; const now = new Date(); const seenTime = new Date(timestamp); const seconds = Math.floor((now - seenTime) / 1000); if (seconds < 60) return "Vài giây trước"; const minutes = Math.floor(seconds / 60); if (minutes < 60) return `${minutes} phút trước`; const hours = Math.floor(minutes / 60); if (hours < 24) return `${hours} giờ trước`; const days = Math.floor(hours / 24); if (days < 30) return `${days} ngày trước`; return seenTime.toLocaleDateString('vi-VN'); }
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -39,6 +38,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const response = await fetch(`/.netlify/functions/get-members?networkId=${networkId}`);
             if (!response.ok) throw new Error(`Server responded with ${response.status}`);
             const members = await response.json();
+            
             memberList.innerHTML = '';
             memberHeader.style.display = 'block';
             if (members.length === 0) { memberList.innerHTML = '<li class="list-group-item">Không có thành viên nào trong network này.</li>'; return; }
@@ -47,10 +47,11 @@ document.addEventListener('DOMContentLoaded', () => {
             members.forEach(member => {
                 const li = document.createElement('li');
                 li.className = 'list-group-item';
-                li.id = `member-${member.id}`;
+                
+                // === THAY ĐỔI QUAN TRỌNG: SỬ DỤNG member.nodeId THAY VÌ member.id ===
+                li.id = `member-${member.nodeId}`;
 
                 const name = member.name || 'Chưa đặt tên';
-                // Xử lý ký tự đặc biệt trong tên để tránh lỗi HTML
                 const escapedName = name.replace(/"/g, '&quot;');
                 const ip = member.config.ipAssignments ? member.config.ipAssignments.join(', ') : 'Chưa có IP';
                 const authorizedStatus = member.config.authorized;
@@ -66,14 +67,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 li.innerHTML = `
                     <div class="d-flex justify-content-between align-items-start flex-wrap">
                         <div class="me-3 mb-2 flex-grow-1">
-                            <div class="view-mode-item">
-                                <strong>${name}</strong>
-                                <button class="btn btn-link btn-sm p-0 ms-2" data-action="edit-name" title="Sửa tên">✏️</button>
-                            </div>
-                            <div class="edit-mode-item">
-                                <input type="text" class="form-control form-control-sm edit-name-input" value="${escapedName}" placeholder="Nhập tên gợi nhớ...">
-                            </div>
-                            <small class="text-muted d-block">${member.id}</small>
+                            <div class="view-mode-item"><strong>${name}</strong><button class="btn btn-link btn-sm p-0 ms-2" data-action="edit-name" title="Sửa tên">✏️</button></div>
+                            <div class="edit-mode-item" style="display:none;"><input type="text" class="form-control form-control-sm edit-name-input" value="${escapedName}" placeholder="Nhập tên gợi nhớ..."></div>
+                            <small class="text-muted d-block">${member.nodeId}</small>
                             <div class="mt-2">
                                 <small>IP ảo: ${ip}</small><br>
                                 <small class="text-info">Physical IP: ${physicalAddress}</small><br>
@@ -83,12 +79,12 @@ document.addEventListener('DOMContentLoaded', () => {
                             </div>
                         </div>
                         <div class="d-flex align-items-center mt-2">
-                            ${!authorizedStatus ? `<div class="me-2"><input type="text" class="form-control form-control-sm new-member-name-input" placeholder="Đặt tên & Duyệt"></div>` : ''}
+                             ${!authorizedStatus ? `<div class="me-2"><input type="text" class="form-control form-control-sm new-member-name-input" placeholder="Đặt tên & Duyệt"></div>` : ''}
                             <span class="me-3 authorized-${authorizedStatus}">${authorizedStatus ? 'Đã duyệt' : 'Chưa duyệt'}</span>
                             <div class="view-mode-item">
                                 <button class="btn btn-sm ${authorizedStatus ? 'btn-outline-danger' : 'btn-outline-success'}" data-action="authorize" data-authorize="${!authorizedStatus}">${authorizedStatus ? 'Hủy duyệt' : 'Duyệt'}</button>
                             </div>
-                            <div class="edit-mode-item">
+                            <div class="edit-mode-item" style="display:none;">
                                 <button class="btn btn-sm btn-success" data-action="save-name">💾 Lưu</button>
                                 <button class="btn btn-sm btn-secondary ms-1" data-action="cancel-edit">Hủy</button>
                             </div>
@@ -130,6 +126,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!button) return;
 
         const listItem = button.closest('.list-group-item');
+        // === THAY ĐỔI QUAN TRỌNG: LẤY ĐÚNG ID TỪ alement li ===
         const memberId = listItem.id.replace('member-', '');
         const networkId = networkSelect.value;
         const action = button.dataset.action;
