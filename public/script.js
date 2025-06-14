@@ -1,3 +1,5 @@
+// public/script.js - Phiên bản đầy đủ tính năng sửa tên và IP
+
 function formatTimeAgo(timestamp) { if (!timestamp || timestamp === 0) return 'Chưa bao giờ'; const now = new Date(); const seenTime = new Date(timestamp); const seconds = Math.floor((now - seenTime) / 1000); if (seconds < 60) return "Vài giây trước"; const minutes = Math.floor(seconds / 60); if (minutes < 60) return `${minutes} phút trước`; const hours = Math.floor(minutes / 60); if (hours < 24) return `${hours} giờ trước`; const days = Math.floor(hours / 24); if (days < 30) return `${days} ngày trước`; return seenTime.toLocaleDateString('vi-VN'); }
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -15,9 +17,10 @@ document.addEventListener('DOMContentLoaded', () => {
             const response = await fetch(`/.netlify/functions/get-members?networkId=${networkId}`);
             if (!response.ok) throw new Error(`Server responded with ${response.status}`);
             const members = await response.json();
+            
             memberList.innerHTML = '';
             memberHeader.style.display = 'block';
-            if (members.length === 0) { memberList.innerHTML = '<li class="list-group-item">Không có thành viên nào trong network này.</li>'; return; }
+            if (members.length === 0) { memberList.innerHTML = '<li class="list-group-item">Không có thành viên nào.</li>'; return; }
             members.sort((a, b) => (a.name || a.nodeId).localeCompare(b.name || b.nodeId));
 
             members.forEach(member => {
@@ -95,9 +98,9 @@ document.addEventListener('DOMContentLoaded', () => {
         } catch (error) {
             console.error('Error updating member:', error);
             alert(`Lỗi: ${error.message}`);
+            // Chỉ khôi phục lại opacity nếu có lỗi, nếu thành công thì loadMembers sẽ vẽ lại toàn bộ
+            if(memberElement) memberElement.style.opacity = '1';
         }
-        // Luôn khôi phục lại trạng thái bình thường dù thành công hay thất bại
-        if (memberElement) memberElement.style.opacity = '1';
     };
     
     const toggleEditState = (listItem, field, isEditing) => {
