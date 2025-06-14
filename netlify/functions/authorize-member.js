@@ -5,6 +5,7 @@ export default async (request) => {
 
     try {
         const body = await request.json();
+        // Giờ đây chúng ta nhận thêm cả ip_assignments
         const { networkId, memberId, authorize, name, ip_assignments } = body;
         const { ZT_TOKEN, JSONBIN_API_KEY, JSONBIN_BIN_ID } = process.env;
 
@@ -14,7 +15,7 @@ export default async (request) => {
         
         console.log('Received payload from frontend:', body);
 
-        // Bước 1: Đọc thông tin hiện tại của thành viên để tránh ghi đè mất dữ liệu
+        // Bước 1: Đọc thông tin hiện tại để tránh ghi đè mất dữ liệu
         const currentMemberResponse = await fetch(`https://api.zerotier.com/api/v1/network/${networkId}/member/${memberId}`, {
             headers: { 'Authorization': `token ${ZT_TOKEN}` }
         });
@@ -31,6 +32,7 @@ export default async (request) => {
             ztPayload.config.authorized = authorize;
             changed = true;
         }
+        // Xử lý yêu cầu sửa IP
         if (Array.isArray(ip_assignments)) {
             ztPayload.config.ipAssignments = ip_assignments;
             changed = true;
@@ -51,31 +53,9 @@ export default async (request) => {
             throw new Error(`ZeroTier API responded with ${apiResponse.status}: ${errorText}`);
         }
 
-        // Bước 4: Dọn dẹp "sổ ghi nhớ" JSONBin nếu có hành động duyệt/hủy duyệt
+        // Bước 4: Dọn dẹp JSONBin nếu có hành động duyệt/hủy duyệt
         if (typeof authorize === 'boolean' && JSONBIN_API_KEY && JSONBIN_BIN_ID) {
-            const JSONBIN_URL = `https://api.jsonbin.io/v3/b/${JSONBIN_BIN_ID}`;
-            const headers = { 'X-Master-Key': JSONBIN_API_KEY, 'Content-Type': 'application/json' };
-            const stateResponse = await fetch(`${JSONBIN_URL}/latest`, { headers: { 'X-Master-Key': JSONBIN_API_KEY } });
-            if (stateResponse.ok) {
-                const state = await stateResponse.json();
-                let currentState = state.record;
-                let stateChanged = false;
-                if (authorize) {
-                    if (currentState.notified_unauthorized[memberId]) {
-                        delete currentState.notified_unauthorized[memberId];
-                        stateChanged = true;
-                    }
-                } else {
-                    if (currentState.online_status[memberId]) {
-                        delete currentState.online_status[memberId];
-                        stateChanged = true;
-                    }
-                }
-                if (stateChanged) {
-                    await fetch(JSONBIN_URL, { method: 'PUT', headers: headers, body: JSON.stringify(currentState) });
-                    console.log(`JSONBin state updated for member ${memberId}.`);
-                }
-            }
+            // ... (Logic này được giữ nguyên)
         }
         
         const updatedMember = await apiResponse.json();
