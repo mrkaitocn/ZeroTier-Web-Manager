@@ -1,14 +1,89 @@
-// public/script.js - Phiên bản cuối cùng, sửa lỗi cú pháp `}` bị thiếu
+// public/script.js - Phiên bản Tối ưu (Chỉ làm mới khi tab hoạt động)
+
+function formatTimeAgo(timestamp) { /* ... Giữ nguyên ... */ }
+
+document.addEventListener('DOMContentLoaded', () => {
+    // ... (Các hằng số giữ nguyên) ...
+    let refreshIntervalId = null;
+    let currentNetworkId = null;
+    const REFRESH_INTERVAL_MS = 3 * 60 * 1000; // Đặt sẵn thời gian làm mới là 3 phút
+
+    // ... (Các hàm showLoading, loadNetworks, loadMembers, updateMember, toggleEditState giữ nguyên như phiên bản trước) ...
+    
+    // --- HÀM MỚI ĐỂ QUẢN LÝ VIỆC LÀM MỚI ---
+    function stopAutoRefresh() {
+        if (refreshIntervalId) {
+            clearInterval(refreshIntervalId);
+            refreshIntervalId = null;
+            console.log('Auto-refresh stopped.');
+        }
+    }
+
+    function startAutoRefresh() {
+        // Chỉ bắt đầu nếu có network được chọn và chưa có bộ đếm nào đang chạy
+        if (currentNetworkId && !refreshIntervalId) {
+            refreshIntervalId = setInterval(() => {
+                // Chỉ làm mới nếu tab đang hiển thị
+                if (document.visibilityState === 'visible') {
+                    console.log(`Auto-refreshing members for network ${currentNetworkId}...`);
+                    loadMembers(currentNetworkId, true);
+                }
+            }, REFRESH_INTERVAL_MS);
+            console.log(`Auto-refresh started. Interval: ${REFRESH_INTERVAL_MS / 1000}s`);
+        }
+    }
+
+    networkSelect.addEventListener('change', () => {
+        currentNetworkId = networkSelect.value;
+        if (!currentNetworkId || currentNetworkId.includes('...')) {
+            stopAutoRefresh();
+            return;
+        }
+        stopAutoRefresh(); // Dừng cái cũ trước
+        loadMembers(currentNetworkId, false);
+        startAutoRefresh(); // Bắt đầu cái mới
+    });
+    
+    // --- API ĐỂ BIẾT KHI NÀO NGƯỜI DÙNG CHUYỂN TAB ---
+    document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'hidden') {
+            stopAutoRefresh(); // Dừng làm mới khi người dùng không nhìn
+        } else {
+            startAutoRefresh(); // Bắt đầu lại khi người dùng quay lại
+        }
+    });
+
+    memberList.addEventListener('click', (event) => { /* ... Giữ nguyên ... */ });
+    
+    loadNetworks();
+});
+// public/script.js - Phiên bản v1.2 + Tính năng Tự Động Làm Mới
 
 function formatTimeAgo(timestamp) { if (!timestamp || timestamp === 0) return 'Chưa bao giờ'; const now = new Date(); const seenTime = new Date(timestamp); const seconds = Math.floor((now - seenTime) / 1000); if (seconds < 60) return "Vài giây trước"; const minutes = Math.floor(seconds / 60); if (minutes < 60) return `${minutes} phút trước`; const hours = Math.floor(minutes / 60); if (hours < 24) return `${hours} giờ trước`; const days = Math.floor(hours / 24); if (days < 30) return `${days} ngày trước`; return seenTime.toLocaleDateString('vi-VN'); }
 
 document.addEventListener('DOMContentLoaded', () => {
+    // --- BIẾN MỚI ---
+    // Biến này để lưu ID của bộ đếm thời gian, giúp chúng ta có thể dừng nó lại
+    let refreshIntervalId = null;
+
+    // --- CÁC HẰNG SỐ ---
     const networkSelect = document.getElementById('network-select');
     const memberList = document.getElementById('member-list');
     const memberHeader = document.getElementById('member-header');
     const loading = document.getElementById('loading-indicator');
 
-    const showLoading = (isLoading) => { loading.style.display = isLoading ? 'block' : 'none'; if (isLoading) { memberHeader.style.display = 'none'; memberList.innerHTML = ''; } };
+    // --- CÁC HÀM ---
+
+    // Hàm showLoading được nâng cấp để không hiển thị spinner lớn khi làm mới trong nền
+    const showLoading = (isLoading, isBackground = false) => {
+        if (isLoading && !isBackground) {
+            loading.style.display = 'block';
+            memberHeader.style.display = 'none';
+            memberList.innerHTML = '';
+        } else if (!isLoading) {
+            loading.style.display = 'none';
+        }
+    };
 
     const loadNetworks = async () => {
         showLoading(true);
@@ -31,10 +106,11 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         } catch (error) { console.error('Error loading networks:', error); alert('Failed to load networks.'); }
         showLoading(false);
-    }; // <-- DẤU NGOẶC NHỌN BỊ THIẾU TRƯỚC ĐÂY ĐÃ ĐƯỢC THÊM LẠI Ở ĐÂY
+    };
 
-    const loadMembers = async (networkId) => {
-        showLoading(true);
+    // Hàm loadMembers được nâng cấp để hỗ trợ làm mới trong nền
+    const loadMembers = async (networkId, isBackground = false) => {
+        showLoading(true, isBackground);
         try {
             const response = await fetch(`/.netlify/functions/get-members?networkId=${networkId}`);
             if (!response.ok) throw new Error(`Server responded with ${response.status}`);
@@ -43,12 +119,10 @@ document.addEventListener('DOMContentLoaded', () => {
             memberHeader.style.display = 'block';
             if (members.length === 0) { memberList.innerHTML = '<li class="list-group-item">Không có thành viên nào.</li>'; return; }
             members.sort((a, b) => (a.name || a.nodeId).localeCompare(b.name || b.nodeId));
-
             members.forEach(member => {
                 const li = document.createElement('li');
                 li.className = 'list-group-item';
                 li.id = `member-${member.nodeId}`;
-
                 const name = member.name || 'Chưa đặt tên';
                 const escapedName = name.replace(/"/g, '&quot;');
                 const ip = member.config.ipAssignments ? member.config.ipAssignments.join(', ') : 'Chưa có IP';
@@ -59,16 +133,15 @@ document.addEventListener('DOMContentLoaded', () => {
                 let locationString = 'Không rõ vị trí';
                 if (location && location.city) locationString = `${location.city}, ${location.country}`;
                 const asn = location ? location.org : 'Không rõ';
-
                 li.innerHTML = `
                     <div class="d-flex justify-content-between align-items-start flex-wrap">
                         <div class="me-3 mb-2 flex-grow-1">
                             <div class="name-view-mode"><strong>${name}</strong><button class="btn btn-link btn-sm p-0 ms-2" data-action="edit-name" title="Sửa tên">✏️</button></div>
-                            <div class="name-edit-mode"><input type="text" class="form-control form-control-sm edit-name-input" value="${escapedName}" placeholder="Nhập tên..."></div>
+                            <div class="name-edit-mode" style="display:none;"><input type="text" class="form-control form-control-sm edit-name-input" value="${escapedName}" placeholder="Nhập tên..."></div>
                             <small class="text-muted d-block">${member.nodeId}</small>
                             <div class="mt-2">
                                 <div class="ip-view-mode"><small>IP ảo: ${ip}</small><button class="btn btn-link btn-sm p-0 ms-2" data-action="edit-ip" title="Sửa IP ảo">✏️</button></div>
-                                <div class="ip-edit-mode"><input type="text" class="form-control form-control-sm edit-ip-input" value="${ip}" placeholder="Nhập IP, cách nhau bởi dấu ,"></div>
+                                <div class="ip-edit-mode" style="display:none;"><input type="text" class="form-control form-control-sm edit-ip-input" value="${ip}" placeholder="Nhập IP, cách nhau bởi dấu ,"></div>
                                 <small class="text-info d-block">Physical IP: ${physicalAddress}</small>
                                 <small class="text-primary d-block">📍 Vị trí: ${locationString}</small>
                                 <small class="text-secondary d-block">🏢 ASN: ${asn}</small>
@@ -83,90 +156,36 @@ document.addEventListener('DOMContentLoaded', () => {
                                     <button class="btn btn-sm ${authorizedStatus ? 'btn-outline-danger' : 'btn-outline-success'}" data-action="authorize" data-authorize="${!authorizedStatus}">${authorizedStatus ? 'Hủy duyệt' : 'Duyệt'}</button>
                                 </div>
                             </div>
-                            <div class="name-edit-mode">
-                                <button class="btn btn-sm btn-success" data-action="save-name">💾 Lưu Tên</button>
-                                <button class="btn btn-sm btn-secondary ms-1" data-action="cancel-edit-name">Hủy</button>
-                            </div>
-                            <div class="ip-edit-mode">
-                                <button class="btn btn-sm btn-success" data-action="save-ip">💾 Lưu IP</button>
-                                <button class="btn btn-sm btn-secondary ms-1" data-action="cancel-edit-ip">Hủy</button>
-                            </div>
+                            <div class="name-edit-mode" style="display:none;"><button class="btn btn-sm btn-success" data-action="save-name">💾 Lưu Tên</button><button class="btn btn-sm btn-secondary ms-1" data-action="cancel-edit-name">Hủy</button></div>
+                            <div class="ip-edit-mode" style="display:none;"><button class="btn btn-sm btn-success" data-action="save-ip">💾 Lưu IP</button><button class="btn btn-sm btn-secondary ms-1" data-action="cancel-edit-ip">Hủy</button></div>
                         </div>
                     </div>`;
                 memberList.appendChild(li);
             });
-        } catch (error) { console.error('Error loading members:', error); alert('Failed to load members.'); }
-        showLoading(false);
+        } catch (error) { if (!isBackground) { console.error('Error loading members:', error); alert('Failed to load members.'); } }
+        showLoading(false, isBackground);
     };
 
-    const updateMember = async (networkId, memberId, payload) => {
-        const memberElement = document.getElementById(`member-${memberId}`);
-        memberElement.style.opacity = '0.5';
-        try {
-            const response = await fetch('/.netlify/functions/authorize-member', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ networkId, memberId, ...payload }) });
-            if (!response.ok) { const errorText = await response.text(); throw new Error(errorText || 'Cập nhật thất bại'); }
-            await loadMembers(networkId);
-        } catch (error) {
-            console.error('Error updating member:', error);
-            alert(`Lỗi: ${error.message}`);
-            if(memberElement) memberElement.style.opacity = '1';
-        }
-    };
-    
-    const toggleEditState = (listItem, field, isEditing) => {
-        const viewItems = listItem.querySelectorAll(`.${field}-view-mode`);
-        const editItems = listItem.querySelectorAll(`.${field}-edit-mode`);
-        const mainControls = listItem.querySelector('.view-mode-controls');
-        
-        viewItems.forEach(el => el.style.display = isEditing ? 'none' : '');
-        editItems.forEach(el => el.style.display = isEditing ? 'flex' : 'none');
-        if(mainControls) mainControls.style.display = isEditing ? 'none' : 'block';
-        if (isEditing) {
-            listItem.querySelector(`.edit-${field}-input`).focus();
-        }
-    };
+    const updateMember = async (networkId, memberId, payload) => { /* ... Giữ nguyên ... */ };
+    const toggleEditState = (listItem, field, isEditing) => { /* ... Giữ nguyên ... */ };
 
-    memberList.addEventListener('click', (event) => {
-        const button = event.target.closest('button');
-        if (!button) return;
+    // --- EVENT LISTENERS ---
 
-        const listItem = button.closest('.list-group-item');
-        const memberId = listItem.id.replace('member-', '');
+    // Event listener cho dropdown chọn network được nâng cấp
+    networkSelect.addEventListener('change', () => {
         const networkId = networkSelect.value;
-        const action = button.dataset.action;
-
-        switch (action) {
-            case 'authorize': {
-                const shouldAuthorize = button.dataset.authorize === 'true';
-                let payload = { authorize: shouldAuthorize };
-                if (shouldAuthorize) {
-                    const nameInput = listItem.querySelector('.new-member-name-input');
-                    if (nameInput && nameInput.value.trim() !== '') {
-                        payload.name = nameInput.value.trim();
-                    }
-                }
-                updateMember(networkId, memberId, payload);
-                break;
-            }
-            case 'edit-name': toggleEditState(listItem, 'name', true); break;
-            case 'save-name': {
-                const nameInput = listItem.querySelector('.edit-name-input');
-                updateMember(networkId, memberId, { name: nameInput.value.trim() });
-                break;
-            }
-            case 'cancel-edit-name': toggleEditState(listItem, 'name', false); break;
-            
-            case 'edit-ip': toggleEditState(listItem, 'ip', true); break;
-            case 'save-ip': {
-                const ipInput = listItem.querySelector('.edit-ip-input');
-                const newIps = ipInput.value.split(',').map(ip => ip.trim()).filter(ip => ip);
-                updateMember(networkId, memberId, { ip_assignments: newIps });
-                break;
-            }
-            case 'cancel-edit-ip': toggleEditState(listItem, 'ip', false); break;
-        }
+        if (!networkId || networkId.includes('...')) return;
+        if (refreshIntervalId) clearInterval(refreshIntervalId);
+        loadMembers(networkId, false); // Lần đầu tải thì hiện spinner
+        const refreshIntervalMs = 1 * 60 * 1000; // 1 phút
+        refreshIntervalId = setInterval(() => {
+            console.log(`Auto-refreshing members for network ${networkId}...`);
+            loadMembers(networkId, true); // Các lần sau làm mới trong nền
+        }, refreshIntervalMs);
     });
+
+    memberList.addEventListener('click', (event) => { /* ... Giữ nguyên ... */ });
     
-    networkSelect.addEventListener('change', () => { if(networkSelect.value && networkSelect.value !== 'Chọn một network...') loadMembers(networkSelect.value); });
+    // Bắt đầu quy trình
     loadNetworks();
 });
