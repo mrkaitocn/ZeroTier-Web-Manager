@@ -1,3 +1,62 @@
+// public/script.js - Phiên bản Tối ưu (Chỉ làm mới khi tab hoạt động)
+
+function formatTimeAgo(timestamp) { /* ... Giữ nguyên ... */ }
+
+document.addEventListener('DOMContentLoaded', () => {
+    // ... (Các hằng số giữ nguyên) ...
+    let refreshIntervalId = null;
+    let currentNetworkId = null;
+    const REFRESH_INTERVAL_MS = 3 * 60 * 1000; // Đặt sẵn thời gian làm mới là 3 phút
+
+    // ... (Các hàm showLoading, loadNetworks, loadMembers, updateMember, toggleEditState giữ nguyên như phiên bản trước) ...
+    
+    // --- HÀM MỚI ĐỂ QUẢN LÝ VIỆC LÀM MỚI ---
+    function stopAutoRefresh() {
+        if (refreshIntervalId) {
+            clearInterval(refreshIntervalId);
+            refreshIntervalId = null;
+            console.log('Auto-refresh stopped.');
+        }
+    }
+
+    function startAutoRefresh() {
+        // Chỉ bắt đầu nếu có network được chọn và chưa có bộ đếm nào đang chạy
+        if (currentNetworkId && !refreshIntervalId) {
+            refreshIntervalId = setInterval(() => {
+                // Chỉ làm mới nếu tab đang hiển thị
+                if (document.visibilityState === 'visible') {
+                    console.log(`Auto-refreshing members for network ${currentNetworkId}...`);
+                    loadMembers(currentNetworkId, true);
+                }
+            }, REFRESH_INTERVAL_MS);
+            console.log(`Auto-refresh started. Interval: ${REFRESH_INTERVAL_MS / 1000}s`);
+        }
+    }
+
+    networkSelect.addEventListener('change', () => {
+        currentNetworkId = networkSelect.value;
+        if (!currentNetworkId || currentNetworkId.includes('...')) {
+            stopAutoRefresh();
+            return;
+        }
+        stopAutoRefresh(); // Dừng cái cũ trước
+        loadMembers(currentNetworkId, false);
+        startAutoRefresh(); // Bắt đầu cái mới
+    });
+    
+    // --- API ĐỂ BIẾT KHI NÀO NGƯỜI DÙNG CHUYỂN TAB ---
+    document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'hidden') {
+            stopAutoRefresh(); // Dừng làm mới khi người dùng không nhìn
+        } else {
+            startAutoRefresh(); // Bắt đầu lại khi người dùng quay lại
+        }
+    });
+
+    memberList.addEventListener('click', (event) => { /* ... Giữ nguyên ... */ });
+    
+    loadNetworks();
+});
 // public/script.js - Phiên bản v1.2 + Tính năng Tự Động Làm Mới
 
 function formatTimeAgo(timestamp) { if (!timestamp || timestamp === 0) return 'Chưa bao giờ'; const now = new Date(); const seenTime = new Date(timestamp); const seconds = Math.floor((now - seenTime) / 1000); if (seconds < 60) return "Vài giây trước"; const minutes = Math.floor(seconds / 60); if (minutes < 60) return `${minutes} phút trước`; const hours = Math.floor(minutes / 60); if (hours < 24) return `${hours} giờ trước`; const days = Math.floor(hours / 24); if (days < 30) return `${days} ngày trước`; return seenTime.toLocaleDateString('vi-VN'); }
