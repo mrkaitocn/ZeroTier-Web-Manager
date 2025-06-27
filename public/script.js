@@ -1,80 +1,17 @@
 // public/script.js - Phiên bản Tối ưu (Chỉ làm mới khi tab hoạt động)
 
-function formatTimeAgo(timestamp) { /* ... Giữ nguyên ... */ }
-
-document.addEventListener('DOMContentLoaded', () => {
-    // ... (Các hằng số giữ nguyên) ...
-    let refreshIntervalId = null;
-    let currentNetworkId = null;
-    const REFRESH_INTERVAL_MS = 3 * 60 * 1000; // Đặt sẵn thời gian làm mới là 3 phút
-
-    // ... (Các hàm showLoading, loadNetworks, loadMembers, updateMember, toggleEditState giữ nguyên như phiên bản trước) ...
-    
-    // --- HÀM MỚI ĐỂ QUẢN LÝ VIỆC LÀM MỚI ---
-    function stopAutoRefresh() {
-        if (refreshIntervalId) {
-            clearInterval(refreshIntervalId);
-            refreshIntervalId = null;
-            console.log('Auto-refresh stopped.');
-        }
-    }
-
-    function startAutoRefresh() {
-        // Chỉ bắt đầu nếu có network được chọn và chưa có bộ đếm nào đang chạy
-        if (currentNetworkId && !refreshIntervalId) {
-            refreshIntervalId = setInterval(() => {
-                // Chỉ làm mới nếu tab đang hiển thị
-                if (document.visibilityState === 'visible') {
-                    console.log(`Auto-refreshing members for network ${currentNetworkId}...`);
-                    loadMembers(currentNetworkId, true);
-                }
-            }, REFRESH_INTERVAL_MS);
-            console.log(`Auto-refresh started. Interval: ${REFRESH_INTERVAL_MS / 1000}s`);
-        }
-    }
-
-    networkSelect.addEventListener('change', () => {
-        currentNetworkId = networkSelect.value;
-        if (!currentNetworkId || currentNetworkId.includes('...')) {
-            stopAutoRefresh();
-            return;
-        }
-        stopAutoRefresh(); // Dừng cái cũ trước
-        loadMembers(currentNetworkId, false);
-        startAutoRefresh(); // Bắt đầu cái mới
-    });
-    
-    // --- API ĐỂ BIẾT KHI NÀO NGƯỜI DÙNG CHUYỂN TAB ---
-    document.addEventListener('visibilitychange', () => {
-        if (document.visibilityState === 'hidden') {
-            stopAutoRefresh(); // Dừng làm mới khi người dùng không nhìn
-        } else {
-            startAutoRefresh(); // Bắt đầu lại khi người dùng quay lại
-        }
-    });
-
-    memberList.addEventListener('click', (event) => { /* ... Giữ nguyên ... */ });
-    
-    loadNetworks();
-});
-// public/script.js - Phiên bản v1.2 + Tính năng Tự Động Làm Mới
-
 function formatTimeAgo(timestamp) { if (!timestamp || timestamp === 0) return 'Chưa bao giờ'; const now = new Date(); const seenTime = new Date(timestamp); const seconds = Math.floor((now - seenTime) / 1000); if (seconds < 60) return "Vài giây trước"; const minutes = Math.floor(seconds / 60); if (minutes < 60) return `${minutes} phút trước`; const hours = Math.floor(minutes / 60); if (hours < 24) return `${hours} giờ trước`; const days = Math.floor(hours / 24); if (days < 30) return `${days} ngày trước`; return seenTime.toLocaleDateString('vi-VN'); }
 
 document.addEventListener('DOMContentLoaded', () => {
-    // --- BIẾN MỚI ---
-    // Biến này để lưu ID của bộ đếm thời gian, giúp chúng ta có thể dừng nó lại
-    let refreshIntervalId = null;
-
-    // --- CÁC HẰNG SỐ ---
     const networkSelect = document.getElementById('network-select');
     const memberList = document.getElementById('member-list');
     const memberHeader = document.getElementById('member-header');
     const loading = document.getElementById('loading-indicator');
 
-    // --- CÁC HÀM ---
+    let refreshIntervalId = null;
+    let currentNetworkId = null;
+    const REFRESH_INTERVAL_MS = 3 * 60 * 1000; // Tần suất làm mới: 3 phút
 
-    // Hàm showLoading được nâng cấp để không hiển thị spinner lớn khi làm mới trong nền
     const showLoading = (isLoading, isBackground = false) => {
         if (isLoading && !isBackground) {
             loading.style.display = 'block';
@@ -107,18 +44,20 @@ document.addEventListener('DOMContentLoaded', () => {
         } catch (error) { console.error('Error loading networks:', error); alert('Failed to load networks.'); }
         showLoading(false);
     };
-
-    // Hàm loadMembers được nâng cấp để hỗ trợ làm mới trong nền
+    
     const loadMembers = async (networkId, isBackground = false) => {
+        // ... (Phần code này giữ nguyên như phiên bản hoàn chỉnh trước đó) ...
         showLoading(true, isBackground);
         try {
             const response = await fetch(`/.netlify/functions/get-members?networkId=${networkId}`);
             if (!response.ok) throw new Error(`Server responded with ${response.status}`);
             const members = await response.json();
+            
             memberList.innerHTML = '';
             memberHeader.style.display = 'block';
             if (members.length === 0) { memberList.innerHTML = '<li class="list-group-item">Không có thành viên nào.</li>'; return; }
             members.sort((a, b) => (a.name || a.nodeId).localeCompare(b.name || b.nodeId));
+
             members.forEach(member => {
                 const li = document.createElement('li');
                 li.className = 'list-group-item';
@@ -133,6 +72,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 let locationString = 'Không rõ vị trí';
                 if (location && location.city) locationString = `${location.city}, ${location.country}`;
                 const asn = location ? location.org : 'Không rõ';
+
                 li.innerHTML = `
                     <div class="d-flex justify-content-between align-items-start flex-wrap">
                         <div class="me-3 mb-2 flex-grow-1">
@@ -169,23 +109,52 @@ document.addEventListener('DOMContentLoaded', () => {
     const updateMember = async (networkId, memberId, payload) => { /* ... Giữ nguyên ... */ };
     const toggleEditState = (listItem, field, isEditing) => { /* ... Giữ nguyên ... */ };
 
-    // --- EVENT LISTENERS ---
+    function stopAutoRefresh() {
+        if (refreshIntervalId) {
+            clearInterval(refreshIntervalId);
+            refreshIntervalId = null;
+            console.log('Auto-refresh stopped.');
+        }
+    }
 
-    // Event listener cho dropdown chọn network được nâng cấp
+    function startAutoRefresh() {
+        if (currentNetworkId && !refreshIntervalId) {
+            console.log(`Auto-refresh started for ${currentNetworkId}.`);
+            refreshIntervalId = setInterval(() => {
+                if (document.visibilityState === 'visible') {
+                    console.log(`Auto-refreshing members...`);
+                    loadMembers(currentNetworkId, true);
+                }
+            }, REFRESH_INTERVAL_MS);
+        }
+    }
+
     networkSelect.addEventListener('change', () => {
-        const networkId = networkSelect.value;
-        if (!networkId || networkId.includes('...')) return;
-        if (refreshIntervalId) clearInterval(refreshIntervalId);
-        loadMembers(networkId, false); // Lần đầu tải thì hiện spinner
-        const refreshIntervalMs = 1 * 60 * 1000; // 1 phút
-        refreshIntervalId = setInterval(() => {
-            console.log(`Auto-refreshing members for network ${networkId}...`);
-            loadMembers(networkId, true); // Các lần sau làm mới trong nền
-        }, refreshIntervalMs);
+        currentNetworkId = networkSelect.value;
+        if (!currentNetworkId || currentNetworkId.includes('...')) {
+            stopAutoRefresh();
+            memberList.innerHTML = '';
+            memberHeader.style.display = 'none';
+            return;
+        }
+        stopAutoRefresh();
+        loadMembers(currentNetworkId, false);
+        startAutoRefresh();
+    });
+    
+    document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'hidden') {
+            stopAutoRefresh();
+        } else {
+            if (currentNetworkId) {
+                console.log('Tab is visible again. Refreshing data now.');
+                loadMembers(currentNetworkId, true);
+                startAutoRefresh();
+            }
+        }
     });
 
     memberList.addEventListener('click', (event) => { /* ... Giữ nguyên ... */ });
     
-    // Bắt đầu quy trình
     loadNetworks();
 });
