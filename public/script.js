@@ -6,7 +6,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const errorMessage = document.getElementById('errorMessage');
 
     // Thay thế URL này bằng URL của Cloudflare Worker của bạn
-    const WORKER_URL = 'https://YOUR_WORKER_SUBDOMAIN.YOUR_WORKER_DOMAIN.workers.dev'; // Ví dụ: https://zerotier-manager-api.yourusername.workers.dev
+    const WORKER_URL = '
+zerotier-backend.mrkaitocn.workers.dev'; // Ví dụ: https://zerotier-manager-api.yourusername.workers.dev
 
     fetchDataBtn.addEventListener('click', fetchData);
 
