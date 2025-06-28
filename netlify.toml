@@ -1,0 +1,15 @@
+# netlify.toml
+
+# Cấu hình build cho trang web chính và các hàm API
+[build]
+  # Thư mục chứa các file frontend (HTML, CSS, JS) để hiển thị cho người dùng.
+  publish = "public"
+  
+  # Thư mục chứa tất cả các hàm serverless của bạn.
+  functions = "netlify/functions"
+
+# Cấu hình LÊN LỊCH CHẠY TỰ ĐỘNG cho hàm check-new-devices
+# Tên trong dấu ngoặc kép phải khớp chính xác với tên tệp (không có .js)
+[functions."check-new-devices"]
+  # Chạy hàm sau mỗi 5 phút theo cú pháp Cron.
+  schedule = "*/5 * * * *"
