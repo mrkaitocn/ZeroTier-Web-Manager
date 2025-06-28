@@ -12,7 +12,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const editDeviceIpInput = document.getElementById('editDeviceIp');
     const saveDeviceChangesBtn = document.getElementById('saveDeviceChangesBtn');
 
-    const WORKER_URL = 'https://YOUR_WORKER_SUBDOMAIN.YOUR_WORKER_DOMAIN.workers.dev'; // Thay thế URL này
+    const WORKER_URL = 'https://zerotier-backend.mrkaitocn.workers.dev/'; // Thay thế URL này
 
     fetchData();
 
