@@ -5,34 +5,35 @@ document.addEventListener('DOMContentLoaded', () => {
     const successMessage = document.getElementById('successMessage');
     const displayNetworkId = document.getElementById('displayNetworkId');
 
-    const editDeviceModal = new bootstrap.Modal(document.getElementById('editDeviceModal'));
-    const editDeviceNetworkIdInput = document.getElementById('editDeviceNetworkId');
-    const editDeviceIdInput = document.getElementById('editDeviceId');
-    const editDeviceNameInput = document.getElementById('editDeviceName');
-    const editDeviceIpInput = document.getElementById('editDeviceIp');
-    const saveDeviceChangesBtn = document.getElementById('saveDeviceChangesBtn');
+    // Các biến liên quan đến Edit Modal đã bị loại bỏ
+    // const editDeviceModal = new bootstrap.Modal(document.getElementById('editDeviceModal'));
+    // const editDeviceNetworkIdInput = document.getElementById('editDeviceNetworkId');
+    // const editDeviceIdInput = document.getElementById('editDeviceId');
+    // const editDeviceNameInput = document.getElementById('editDeviceName');
+    // const editDeviceIpInput = document.getElementById('editDeviceIp');
+    // const saveDeviceChangesBtn = document.getElementById('saveDeviceChangesBtn');
 
-    const WORKER_URL = 'https://zerotier-backend.mrkaitocn.workers.dev/'; // REPLACE WITH YOUR ACTUAL WORKER URL!
+    const WORKER_URL = 'https://zerotier-backend.mrkaitocn.workers.dev/'; // THAY THẾ BẰNG URL WORKER THỰC TẾ CỦA BẠN!
 
-    // Helper function to hide all messages
+    // Hàm để ẩn thông báo sau một thời gian
     function hideMessages() {
         errorMessage.style.display = 'none';
         successMessage.style.display = 'none';
     }
 
-    // Helper function to display messages
+    // Hàm hiển thị thông báo
     function displayMessage(message, type) {
-        hideMessages(); // Hide existing messages first
+        hideMessages(); // Ẩn thông báo cũ trước
         const targetMessageElement = type === 'success' ? successMessage : errorMessage;
         targetMessageElement.textContent = message;
         targetMessageElement.style.display = 'block';
 
         setTimeout(() => {
             hideMessages();
-        }, 5000); // Hide after 5 seconds
+        }, 5000); // Ẩn sau 5 giây
     }
 
-    // Automatically fetch data when the page loads
+    // Tự động gọi fetchData khi trang được tải
     fetchData();
 
     async function fetchData() {
@@ -49,11 +50,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 throw new Error(`Error ${response.status}: ${errorText}`);
             }
 
-            const data = await response.json(); // Expects an object containing networkId and devices
+            const data = await response.json(); // Nhận object chứa networkId và devices
             const networkId = data.networkId;
             const devices = data.devices;
 
-            displayNetworkId.textContent = networkId; // Display the Network ID
+            displayNetworkId.textContent = networkId; // Hiển thị Network ID
 
             renderDeviceCards(devices);
 
@@ -83,8 +84,8 @@ document.addEventListener('DOMContentLoaded', () => {
             html += `
                 <div class="col-md-6">
                     <div class="device-card ${statusClass}">
-                        <h5>${device.name} <small class="text-muted">(ID: ${device.zerotierId.substring(0, 8)}...)</small></h5>
-                        <p><strong>ZeroTier IP:</strong> ${device.zerotierIp}</p>
+                        <h5>${device.name}</h5>
+                        <p><strong>ZeroTier ID:</strong> ${device.zerotierId}</p> <p><strong>ZeroTier IP:</strong> ${device.zerotierIp}</p>
                         <p><strong>Physical IP:</strong> ${device.physicalIp}</p>
                         <p><strong>Location:</strong> ${device.location}</p>
                         <p><strong>ASN:</strong> ${device.asn}</p>
@@ -96,28 +97,18 @@ document.addEventListener('DOMContentLoaded', () => {
                                 data-authorized="${device.authorized ? 'true' : 'false'}">
                                 ${authorizeBtnText}
                             </button>
-                            <button type="button" class="btn btn-info btn-sm edit-btn"
-                                data-bs-toggle="modal" data-bs-target="#editDeviceModal"
-                                data-network-id="${device.networkId}"
-                                data-member-id="${device.zerotierId}"
-                                data-name="${device.name}"
-                                data-ip="${device.zerotierIp !== 'N/A' ? device.zerotierIp : ''}">
-                                Edit
-                            </button>
-                        </div>
+                            </div>
                     </div>
                 </div>
             `;
         });
         deviceListDiv.innerHTML = html;
 
-        // Attach event listeners after rendering (IMPORTANT for dynamic content)
+        // Gắn lại các sự kiện sau khi render xong
         document.querySelectorAll('.authorize-btn').forEach(button => {
             button.addEventListener('click', handleAuthorizeToggle);
         });
-        document.querySelectorAll('.edit-btn').forEach(button => {
-            button.addEventListener('click', openEditModal);
-        });
+        // Event listener cho nút Edit đã bị loại bỏ
     }
 
     async function handleAuthorizeToggle(event) {
@@ -156,82 +147,14 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    function openEditModal(event) {
-        const button = event.target;
-        editDeviceNetworkIdInput.value = button.dataset.networkId;
-        editDeviceIdInput.value = button.dataset.memberId;
-        editDeviceNameInput.value = button.dataset.name;
-        // Set defaultValue to handle no changes correctly
-        editDeviceNameInput.defaultValue = button.dataset.name;
+    // Hàm mở Edit Modal đã bị loại bỏ
+    // function openEditModal(event) { ... }
 
-        const currentIp = button.dataset.ip;
-        editDeviceIpInput.value = currentIp;
-        // Set defaultValue to handle no changes correctly
-        editDeviceIpInput.defaultValue = currentIp;
-    }
+    // Event listener cho nút Save Changes đã bị loại bỏ
+    // saveDeviceChangesBtn.addEventListener('click', async () => { ... });
 
-    saveDeviceChangesBtn.addEventListener('click', async () => {
-        const networkId = editDeviceNetworkIdInput.value;
-        const memberId = editDeviceIdInput.value;
-        const newName = editDeviceNameInput.value.trim();
-        const newIp = editDeviceIpInput.value.trim();
 
-        editDeviceModal.hide(); // Hide modal immediately
-
-        loadingSpinner.style.display = 'block'; // Show spinner
-        hideMessages();
-
-        try {
-            let payload = { networkId, memberId };
-            let hasChanges = false;
-
-            // Check if name has changed from its *initial* value when modal opened
-            if (newName !== editDeviceNameInput.defaultValue) {
-                payload.newName = newName;
-                hasChanges = true;
-            }
-
-            // Check if IP has changed from its *initial* value when modal opened
-            if (newIp !== editDeviceIpInput.defaultValue) {
-                const ipRegex = /^(?:[0-9]{1,3}\.){3}[0-9]{1,3}$/;
-                if (newIp !== '' && !ipRegex.test(newIp)) { // Allow empty string to clear IP
-                    throw new Error('Invalid IP address format. Please enter a valid IPv4 address or leave empty to clear.');
-                }
-                payload.newIp = newIp;
-                hasChanges = true;
-            }
-
-            if (!hasChanges) {
-                displayMessage('No changes to save.', 'info');
-                return;
-            }
-
-            const response = await fetch(WORKER_URL, {
-                method: 'PUT',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify(payload)
-            });
-
-            if (!response.ok) {
-                const errorText = await response.text();
-                throw new Error(`Server responded with error: ${response.status} - ${errorText}`);
-            }
-
-            const result = await response.json();
-            displayMessage(result.message, 'success');
-            fetchData(); // Re-fetch data to update UI
-
-        } catch (error) {
-            console.error('Error saving device changes:', error);
-            displayMessage(`Failed to save device changes: ${error.message}`, 'danger');
-        } finally {
-            loadingSpinner.style.display = 'none';
-        }
-    });
-
-    // Fix for Last Seen formatting
+    // Fix cho Last Seen formatting
     function formatLastSeen(timestamp) {
         if (!timestamp) return 'N/A';
         const date = new Date(timestamp);
