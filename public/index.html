@@ -51,7 +51,7 @@
         .device-card .btn-group {
             margin-top: 10px;
         }
-        .loading-spinner, .error-message {
+        .loading-spinner, .alert-message { /* Đổi tên class để thống nhất */
             text-align: center;
             margin-top: 20px;
         }
@@ -78,8 +78,8 @@
             <p class="mt-2">Loading ZeroTier devices...</p>
         </div>
 
-        <div id="errorMessage" class="alert alert-danger error-message" style="display: none;" role="alert"></div>
-        <div id="successMessage" class="alert alert-success error-message" style="display: none;" role="alert"></div>
+        <div id="errorMessage" class="alert alert-danger alert-message" style="display: none;" role="alert"></div>
+        <div id="successMessage" class="alert alert-success alert-message" style="display: none;" role="alert"></div>
 
 
         <div id="deviceList" class="row">
@@ -103,7 +103,7 @@
                     <div class="mb-3">
                         <label for="editDeviceIp" class="form-label">ZeroTier IP:</label>
                         <input type="text" class="form-control" id="editDeviceIp" placeholder="e.g., 10.147.17.1">
-                        <small class="form-text text-muted">Enter a single IPv4 address. Existing IPs will be replaced.</small>
+                        <small class="form-text text-muted">Enter a single IPv4 address. Existing IPs will be replaced. Leave empty to clear.</small>
                     </div>
                 </div>
                 <div class="modal-footer">
