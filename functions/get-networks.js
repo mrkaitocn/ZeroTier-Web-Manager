@@ -1,33 +1,15 @@
-// Cú pháp chuẩn cho Netlify Functions
-export default async () => {
-  const ZT_TOKEN = process.env.ZT_TOKEN;
-
-  if (!ZT_TOKEN) {
-    return new Response(JSON.stringify({ error: 'ZeroTier API token not configured on Netlify' }), {
-      statusCode: 500,
-      headers: { 'Content-Type': 'application/json' },
-    });
-  }
-
-  try {
-    const apiResponse = await fetch('https://api.zerotier.com/api/v1/network', {
-      headers: { 'Authorization': `token ${ZT_TOKEN}` },
-    });
-
-    if (!apiResponse.ok) {
-        const errorText = await apiResponse.text();
-        throw new Error(`ZeroTier API responded with ${apiResponse.status}: ${errorText}`);
+export async function onRequest(context) {
+    const { ZT_TOKEN } = context.env;
+    try {
+        const response = await fetch('https://api.zerotier.com/api/v1/network', {
+            headers: { 'Authorization': `token ${ZT_TOKEN}` }
+        });
+        if (!response.ok) throw new Error('Failed to fetch networks');
+        const networks = await response.json();
+        return new Response(JSON.stringify(networks), {
+            headers: { 'Content-Type': 'application/json' }
+        });
+    } catch (error) {
+        return new Response(error.message, { status: 500 });
     }
-    
-    const networks = await apiResponse.json();
-    return new Response(JSON.stringify(networks), {
-      statusCode: 200,
-      headers: { 'Content-Type': 'application/json' },
-    });
-  } catch (error) {
-    return new Response(JSON.stringify({ error: error.message }), {
-      statusCode: 500,
-      headers: { 'Content-Type': 'application/json' },
-    });
-  }
-};
+}
