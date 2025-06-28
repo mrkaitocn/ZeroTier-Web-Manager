@@ -11,7 +11,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const saveDeviceChangesBtn = document.getElementById('saveDeviceChangesBtn');
 
     // Thay thế URL này bằng URL của Cloudflare Worker của bạn
-    const WORKER_URL = 'https://YOUR_WORKER_SUBDOMAIN.YOUR_WORKER_DOMAIN.workers.dev';
+    const WORKER_URL = 'https://zerotier-backend.mrkaitocn.workers.dev/';
 
     // Tự động gọi fetchData khi trang được tải
     fetchData();
