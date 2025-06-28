@@ -1,14 +1,14 @@
-// public/script.js - Phiên bản khôi phục cơ bản
+// public/script.js - Nâng cấp Bước 1: Hiển thị thông tin chi tiết
+
+function formatTimeAgo(timestamp) { if (!timestamp || timestamp === 0) return 'Chưa bao giờ'; const now = new Date(); const seenTime = new Date(timestamp); const seconds = Math.floor((now - seenTime) / 1000); if (seconds < 60) return "Vài giây trước"; const minutes = Math.floor(seconds / 60); if (minutes < 60) return `${minutes} phút trước`; const hours = Math.floor(minutes / 60); if (hours < 24) return `${hours} giờ trước`; const days = Math.floor(hours / 24); if (days < 30) return `${days} ngày trước`; return seenTime.toLocaleDateString('vi-VN'); }
 
 document.addEventListener('DOMContentLoaded', () => {
-    // --- KHAI BÁO BIẾN ---
     const WORKER_URL = 'https://zerotier-backend.mrkaitocn.workers.dev';
     const networkSelect = document.getElementById('network-select');
     const memberList = document.getElementById('member-list');
     const memberHeader = document.getElementById('member-header');
     const loading = document.getElementById('loading-indicator');
 
-    // --- CÁC HÀM ---
     const showLoading = (isLoading) => {
         if (isLoading) {
             loading.style.display = 'block';
@@ -58,17 +58,34 @@ document.addEventListener('DOMContentLoaded', () => {
 
             members.forEach(member => {
                 const li = document.createElement('li');
-                li.className = 'list-group-item d-flex justify-content-between align-items-center';
+                li.className = 'list-group-item d-flex justify-content-between align-items-center flex-wrap';
                 li.id = `member-${member.nodeId}`;
 
                 const name = member.name || 'Chưa đặt tên';
+                const ip = member.config.ipAssignments ? member.config.ipAssignments.join(', ') : 'Chưa có IP';
                 const authorizedStatus = member.config.authorized;
+                
+                // Lấy các thông tin chi tiết
+                const lastSeen = member.lastSeen;
+                const physicalAddress = member.physicalAddress ? member.physicalAddress.split('/')[0] : 'N/A';
+                const location = member.location;
+                let locationString = 'Không rõ vị trí';
+                if (location && location.city) locationString = `${location.city}, ${location.country}`;
+                const asnString = location && location.org ? location.org : 'Không rõ';
 
+                // Cập nhật HTML để hiển thị thêm thông tin
                 li.innerHTML = `
-                    <div>
+                    <div class="me-3 mb-2">
                         <strong>${name}</strong>
                         <br>
                         <small class="text-muted">${member.nodeId}</small>
+                        <div class="mt-2">
+                            <small>IP ảo: ${ip}</small><br>
+                            <small class="text-info">Physical IP: ${physicalAddress}</small><br>
+                            <small class="text-primary">📍 Vị trí: ${locationString}</small><br>
+                            <small class="text-secondary">🏢 ASN: ${asnString}</small><br>
+                            <small class="text-success">Last Seen: ${formatTimeAgo(lastSeen)}</small>
+                        </div>
                     </div>
                     <div class="d-flex align-items-center">
                         <span class="me-3 ${authorizedStatus ? 'text-success' : 'text-danger'}">${authorizedStatus ? 'Đã duyệt' : 'Chưa duyệt'}</span>
@@ -107,7 +124,6 @@ document.addEventListener('DOMContentLoaded', () => {
         showLoading(false);
     };
 
-    // --- EVENT LISTENERS ---
     networkSelect.addEventListener('change', () => {
         const networkId = networkSelect.value;
         if (networkId && !networkId.includes('...')) {
@@ -127,6 +143,5 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
     
-    // Bắt đầu
     loadNetworks();
 });
