@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ZeroTier Network Manager</title>
+    <title>ZeroTier Network Manager (Single Network)</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <style>
         body {
@@ -16,7 +16,6 @@
             vertical-align: middle;
         }
         .loading-spinner {
-            display: none;
             text-align: center;
             margin-top: 20px;
         }
@@ -24,18 +23,13 @@
 </head>
 <body>
     <div class="container">
-        <h1 class="mb-4 text-center">ZeroTier Network Manager</h1>
-
-        <div class="input-group mb-3">
-            <input type="text" id="networkIdInput" class="form-control" placeholder="Enter ZeroTier Network ID">
-            <button class="btn btn-primary" id="fetchDataBtn">Fetch Devices</button>
-        </div>
+        <h1 class="mb-4 text-center">ZeroTier Network Manager (Single Network)</h1>
 
         <div id="loadingSpinner" class="loading-spinner">
             <div class="spinner-border text-primary" role="status">
                 <span class="visually-hidden">Loading...</span>
             </div>
-            <p class="mt-2">Loading device data...</p>
+            <p class="mt-2">Loading ZeroTier devices...</p>
         </div>
 
         <div id="errorMessage" class="alert alert-danger" style="display: none;" role="alert"></div>
@@ -53,8 +47,7 @@
                     </tr>
                 </thead>
                 <tbody id="deviceTableBody">
-                    <tr><td colspan="6" class="text-center">Enter Network ID and click "Fetch Devices"</td></tr>
-                </tbody>
+                    </tbody>
             </table>
         </div>
     </div>
