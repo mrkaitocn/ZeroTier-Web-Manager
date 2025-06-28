@@ -1,28 +1,21 @@
 document.addEventListener('DOMContentLoaded', () => {
-    const networkIdInput = document.getElementById('networkIdInput');
-    const fetchDataBtn = document.getElementById('fetchDataBtn');
     const deviceTableBody = document.getElementById('deviceTableBody');
     const loadingSpinner = document.getElementById('loadingSpinner');
     const errorMessage = document.getElementById('errorMessage');
 
     // Thay thế URL này bằng URL của Cloudflare Worker của bạn
-    const WORKER_URL = 'zerotier-backend.mrkaitocn.workers.dev'; // Ví dụ: https://zerotier-manager-api.yourusername.workers.dev
+    const WORKER_URL = 'https://zerotier-backend.mrkaitocn.workers.dev/'; // Ví dụ: https://zerotier-manager-api.yourusername.workers.dev
 
-    fetchDataBtn.addEventListener('click', fetchData);
+    // Tự động gọi fetchData khi trang được tải
+    fetchData();
 
     async function fetchData() {
-        const networkId = networkIdInput.value.trim();
-        if (!networkId) {
-            displayMessage('Please enter a ZeroTier Network ID.', 'danger');
-            return;
-        }
-
-        deviceTableBody.innerHTML = '';
+        deviceTableBody.innerHTML = ''; // Xóa nội dung cũ
         errorMessage.style.display = 'none';
         loadingSpinner.style.display = 'block';
 
         try {
-            const response = await fetch(`${WORKER_URL}?networkId=${networkId}`);
+            const response = await fetch(WORKER_URL); // Không cần truyền networkId nữa
 
             if (!response.ok) {
                 const errorText = await response.text();
