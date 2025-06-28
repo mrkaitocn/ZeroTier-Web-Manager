@@ -1,4 +1,4 @@
-// public/script.js - Phiên bản cuối cùng, gọi đến Cloudflare Worker
+// public/script.js - Phiên bản cuối cùng, đã sửa lỗi cú pháp
 
 function formatTimeAgo(timestamp) {
     if (!timestamp || timestamp === 0) return 'Chưa bao giờ';
@@ -16,10 +16,8 @@ function formatTimeAgo(timestamp) {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
-    // --- ĐỊA CHỈ WORKER BACKEND MỚI CỦA BẠN ---
-    const WORKER_URL = 'https://zerotier-backend.mrkaitocn.workers.dev';
-
     // --- KHAI BÁO BIẾN ---
+    const WORKER_URL = 'https://zerotier-backend.mrkaitocn.workers.dev';
     const networkSelect = document.getElementById('network-select');
     const memberList = document.getElementById('member-list');
     const memberHeader = document.getElementById('member-header');
@@ -27,7 +25,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     let refreshIntervalId = null;
     let currentNetworkId = null;
-    const REFRESH_INTERVAL_MS = 3 * 60 * 1000;
+    const REFRESH_INTERVAL_MS = 5 * 60 * 1000;
 
     // --- CÁC HÀM TIỆN ÍCH ---
     const showLoading = (isLoading, isBackground = false) => {
@@ -81,31 +79,5 @@ document.addEventListener('DOMContentLoaded', () => {
             const response = await fetch(`${WORKER_URL}/get-members?networkId=${networkId}`);
             if (!response.ok) throw new Error(`Server responded with ${response.status}`);
             const members = await response.json();
-
+            
             memberList.innerHTML = '';
-            memberHeader.style.display = 'block';
-            if (members.length === 0) {
-                memberList.innerHTML = '<li class="list-group-item">Không có thành viên nào trong network này.</li>';
-                return;
-            }
-            members.sort((a, b) => (a.name || a.nodeId).localeCompare(b.name || b.nodeId));
-
-            members.forEach(member => {
-                const li = document.createElement('li');
-                li.className = 'list-group-item';
-                li.id = `member-${member.nodeId}`;
-                const name = member.name || 'Chưa đặt tên';
-                const escapedName = name.replace(/"/g, '&quot;');
-                const ip = member.config.ipAssignments ? member.config.ipAssignments.join(', ') : 'Chưa có IP';
-                const authorizedStatus = member.config.authorized;
-                const lastSeen = member.lastSeen;
-                const physicalAddress = member.physicalAddress ? member.physicalAddress.split('/')[0] : 'N/A';
-                const location = member.location;
-                let locationString = 'Không rõ vị trí';
-                if (location && location.city) locationString = `${location.city}, ${location.country}`;
-                const asn = location ? location.org : 'Không rõ';
-
-                li.innerHTML = `
-                    <div class="d-flex justify-content-between align-items-start flex-wrap">
-                        <div class="me-3 mb-2 flex-grow-1">
-                            <div class="name-view-mode"><strong>${name}</strong><button class="btn btn-link btn-sm
