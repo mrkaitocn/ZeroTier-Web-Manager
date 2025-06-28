@@ -12,27 +12,27 @@ document.addEventListener('DOMContentLoaded', () => {
     const editDeviceIpInput = document.getElementById('editDeviceIp');
     const saveDeviceChangesBtn = document.getElementById('saveDeviceChangesBtn');
 
-    const WORKER_URL = 'https://zerotier-backend.mrkaitocn.workers.dev/'; // Thay thế URL này
+    const WORKER_URL = 'https://zerotier-backend.mrkaitocn.workers.dev/'; // REPLACE WITH YOUR ACTUAL WORKER URL!
 
-    // Hàm để ẩn thông báo sau một thời gian
+    // Helper function to hide all messages
     function hideMessages() {
         errorMessage.style.display = 'none';
         successMessage.style.display = 'none';
     }
 
-    // Hàm hiển thị thông báo
+    // Helper function to display messages
     function displayMessage(message, type) {
-        hideMessages(); // Ẩn thông báo cũ trước
+        hideMessages(); // Hide existing messages first
         const targetMessageElement = type === 'success' ? successMessage : errorMessage;
         targetMessageElement.textContent = message;
         targetMessageElement.style.display = 'block';
 
         setTimeout(() => {
             hideMessages();
-        }, 5000); // Ẩn sau 5 giây
+        }, 5000); // Hide after 5 seconds
     }
 
-    // Tự động gọi fetchData khi trang được tải
+    // Automatically fetch data when the page loads
     fetchData();
 
     async function fetchData() {
@@ -49,11 +49,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 throw new Error(`Error ${response.status}: ${errorText}`);
             }
 
-            const data = await response.json();
+            const data = await response.json(); // Expects an object containing networkId and devices
             const networkId = data.networkId;
             const devices = data.devices;
 
-            displayNetworkId.textContent = networkId;
+            displayNetworkId.textContent = networkId; // Display the Network ID
 
             renderDeviceCards(devices);
 
@@ -101,7 +101,7 @@ document.addEventListener('DOMContentLoaded', () => {
                                 data-network-id="${device.networkId}"
                                 data-member-id="${device.zerotierId}"
                                 data-name="${device.name}"
-                                data-ip="${device.zerotierIp}">
+                                data-ip="${device.zerotierIp !== 'N/A' ? device.zerotierIp : ''}">
                                 Edit
                             </button>
                         </div>
@@ -111,7 +111,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
         deviceListDiv.innerHTML = html;
 
-        // Gắn lại các sự kiện sau khi render xong
+        // Attach event listeners after rendering (IMPORTANT for dynamic content)
         document.querySelectorAll('.authorize-btn').forEach(button => {
             button.addEventListener('click', handleAuthorizeToggle);
         });
@@ -161,7 +161,13 @@ document.addEventListener('DOMContentLoaded', () => {
         editDeviceNetworkIdInput.value = button.dataset.networkId;
         editDeviceIdInput.value = button.dataset.memberId;
         editDeviceNameInput.value = button.dataset.name;
-        editDeviceIpInput.value = button.dataset.ip !== 'N/A' ? button.dataset.ip : '';
+        // Set defaultValue to handle no changes correctly
+        editDeviceNameInput.defaultValue = button.dataset.name;
+
+        const currentIp = button.dataset.ip;
+        editDeviceIpInput.value = currentIp;
+        // Set defaultValue to handle no changes correctly
+        editDeviceIpInput.defaultValue = currentIp;
     }
 
     saveDeviceChangesBtn.addEventListener('click', async () => {
@@ -170,32 +176,30 @@ document.addEventListener('DOMContentLoaded', () => {
         const newName = editDeviceNameInput.value.trim();
         const newIp = editDeviceIpInput.value.trim();
 
-        editDeviceModal.hide(); // Ẩn modal ngay lập tức
+        editDeviceModal.hide(); // Hide modal immediately
 
-        loadingSpinner.style.display = 'block'; // Hiển thị spinner
+        loadingSpinner.style.display = 'block'; // Show spinner
         hideMessages();
 
         try {
             let payload = { networkId, memberId };
             let hasChanges = false;
 
-            // Kiểm tra và thêm newName vào payload nếu có sự thay đổi hoặc muốn xóa tên
-            // So sánh với giá trị hiện tại trong modal, không phải giá trị ban đầu của device
-            if (newName !== document.getElementById('editDeviceName').defaultValue.trim()) {
+            // Check if name has changed from its *initial* value when modal opened
+            if (newName !== editDeviceNameInput.defaultValue) {
                 payload.newName = newName;
                 hasChanges = true;
             }
 
-            // Kiểm tra và thêm newIp vào payload nếu có sự thay đổi hoặc muốn xóa IP
-            if (newIp !== document.getElementById('editDeviceIp').defaultValue.trim() && newIp !== 'N/A') {
+            // Check if IP has changed from its *initial* value when modal opened
+            if (newIp !== editDeviceIpInput.defaultValue) {
                 const ipRegex = /^(?:[0-9]{1,3}\.){3}[0-9]{1,3}$/;
-                if (newIp !== '' && !ipRegex.test(newIp)) { // Cho phép để trống để xóa IP
+                if (newIp !== '' && !ipRegex.test(newIp)) { // Allow empty string to clear IP
                     throw new Error('Invalid IP address format. Please enter a valid IPv4 address or leave empty to clear.');
                 }
                 payload.newIp = newIp;
                 hasChanges = true;
             }
-
 
             if (!hasChanges) {
                 displayMessage('No changes to save.', 'info');
@@ -217,7 +221,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             const result = await response.json();
             displayMessage(result.message, 'success');
-            fetchData(); // Tải lại dữ liệu để cập nhật UI
+            fetchData(); // Re-fetch data to update UI
 
         } catch (error) {
             console.error('Error saving device changes:', error);
@@ -227,21 +231,30 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-
+    // Fix for Last Seen formatting
     function formatLastSeen(timestamp) {
         if (!timestamp) return 'N/A';
         const date = new Date(timestamp);
         const now = new Date();
-        const diffSeconds = Math.floor((now - date) / 1000);
+        const diffMillis = now.getTime() - date.getTime();
+        const diffSeconds = Math.floor(diffMillis / 1000);
 
+        if (diffSeconds < 0) return 'In the future?'; // Should not happen
         if (diffSeconds < 60) return `${diffSeconds} seconds ago`;
+
         const diffMinutes = Math.floor(diffSeconds / 60);
         if (diffMinutes < 60) return `${diffMinutes} minutes ago`;
+
         const diffHours = Math.floor(diffMinutes / 60);
         if (diffHours < 24) return `${diffHours} hours ago`;
-        const diffDays = Math.floor(diffHours / 30); // Use 30 days for a month approximation
-        if (diffDays < 12) return `${diffDays} months ago`; // Approx. months
-        const diffYears = Math.floor(diffDays / 12); // Approx. years
+
+        const diffDays = Math.floor(diffHours / 24);
+        if (diffDays < 30) return `${diffDays} days ago`; // Up to ~1 month
+
+        const diffMonths = Math.floor(diffDays / 30.44); // Average days in a month
+        if (diffMonths < 12) return `${diffMonths} months ago`;
+
+        const diffYears = Math.floor(diffMonths / 12);
         return `${diffYears} years ago`;
     }
 });
