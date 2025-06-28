@@ -2,6 +2,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const deviceListDiv = document.getElementById('deviceList');
     const loadingSpinner = document.getElementById('loadingSpinner');
     const errorMessage = document.getElementById('errorMessage');
+    const successMessage = document.getElementById('successMessage');
+    const displayNetworkId = document.getElementById('displayNetworkId');
 
     const editDeviceModal = new bootstrap.Modal(document.getElementById('editDeviceModal'));
     const editDeviceNetworkIdInput = document.getElementById('editDeviceNetworkId');
@@ -10,16 +12,16 @@ document.addEventListener('DOMContentLoaded', () => {
     const editDeviceIpInput = document.getElementById('editDeviceIp');
     const saveDeviceChangesBtn = document.getElementById('saveDeviceChangesBtn');
 
-    // Thay thế URL này bằng URL của Cloudflare Worker của bạn
-    const WORKER_URL = 'https://zerotier-backend.mrkaitocn.workers.dev/';
+    const WORKER_URL = 'https://YOUR_WORKER_SUBDOMAIN.YOUR_WORKER_DOMAIN.workers.dev'; // Thay thế URL này
 
-    // Tự động gọi fetchData khi trang được tải
     fetchData();
 
     async function fetchData() {
-        deviceListDiv.innerHTML = ''; // Xóa nội dung cũ
+        deviceListDiv.innerHTML = '';
         errorMessage.style.display = 'none';
+        successMessage.style.display = 'none';
         loadingSpinner.style.display = 'block';
+        displayNetworkId.textContent = 'Loading...';
 
         try {
             const response = await fetch(WORKER_URL);
@@ -29,13 +31,19 @@ document.addEventListener('DOMContentLoaded', () => {
                 throw new Error(`Error ${response.status}: ${errorText}`);
             }
 
-            const devices = await response.json();
+            const data = await response.json(); // Nhận object chứa networkId và devices
+            const networkId = data.networkId;
+            const devices = data.devices;
+
+            displayNetworkId.textContent = networkId; // Hiển thị Network ID
+
             renderDeviceCards(devices);
 
         } catch (error) {
             console.error('Error fetching data:', error);
             displayMessage(`Failed to fetch device data: ${error.message}`, 'danger');
             deviceListDiv.innerHTML = '<div class="col-12 text-center text-muted">Error loading data.</div>';
+            displayNetworkId.textContent = 'Error';
         } finally {
             loadingSpinner.style.display = 'none';
         }
@@ -57,7 +65,7 @@ document.addEventListener('DOMContentLoaded', () => {
             html += `
                 <div class="col-md-6">
                     <div class="device-card ${statusClass}">
-                        <h5>${device.name} (${device.zerotierId.substring(0, 8)}...)</h5>
+                        <h5>${device.name} <small class="text-muted">(ID: ${device.zerotierId.substring(0, 8)}...)</small></h5>
                         <p><strong>ZeroTier IP:</strong> ${device.zerotierIp}</p>
                         <p><strong>Physical IP:</strong> ${device.physicalIp}</p>
                         <p><strong>Location:</strong> ${device.location}</p>
@@ -85,7 +93,6 @@ document.addEventListener('DOMContentLoaded', () => {
         });
         deviceListDiv.innerHTML = html;
 
-        // Attach event listeners after rendering
         document.querySelectorAll('.authorize-btn').forEach(button => {
             button.addEventListener('click', handleAuthorizeToggle);
         });
@@ -101,7 +108,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const currentAuthorized = button.dataset.authorized === 'true';
         const action = currentAuthorized ? 'deauthorize' : 'authorize';
 
-        button.disabled = true; // Disable button during request
+        button.disabled = true;
         button.textContent = 'Processing...';
 
         try {
@@ -120,7 +127,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             const result = await response.json();
             displayMessage(result.message, 'success');
-            fetchData(); // Re-fetch data to update UI
+            fetchData();
 
         } catch (error) {
             console.error('Error toggling authorization:', error);
@@ -144,45 +151,53 @@ document.addEventListener('DOMContentLoaded', () => {
         const newName = editDeviceNameInput.value.trim();
         const newIp = editDeviceIpInput.value.trim();
 
-        if (!newName && !newIp) {
-            displayMessage('Please enter a new name or a new ZeroTier IP.', 'warning');
-            return;
-        }
-
         editDeviceModal.hide(); // Hide modal immediately
 
         loadingSpinner.style.display = 'block'; // Show loading spinner
         errorMessage.style.display = 'none';
+        successMessage.style.display = 'none';
 
         try {
             let payload = { networkId, memberId };
             let hasChanges = false;
 
-            if (newName) {
-                payload.action = 'rename';
+            // Only include name in payload if it's explicitly provided
+            if (newName !== '') { // Use empty string to indicate user cleared it
                 payload.newName = newName;
-                await sendUpdate(payload);
                 hasChanges = true;
             }
 
-            if (newIp) {
-                // Basic IP validation (can be more robust)
+            // Only include IP in payload if it's explicitly provided
+            if (newIp !== '') { // Use empty string to indicate user cleared it
                 const ipRegex = /^(?:[0-9]{1,3}\.){3}[0-9]{1,3}$/;
-                if (!ipRegex.test(newIp)) {
-                    throw new Error('Invalid IP address format. Please enter a valid IPv4 address.');
+                if (!ipRegex.test(newIp) && newIp !== '') { // Allow empty string to clear IP
+                    throw new Error('Invalid IP address format. Please enter a valid IPv4 address or leave empty to clear.');
                 }
-                payload.action = 'updateIp';
                 payload.newIp = newIp;
-                await sendUpdate(payload);
                 hasChanges = true;
             }
 
-            if (hasChanges) {
-                displayMessage('Device updated successfully. Re-fetching data...', 'success');
-                fetchData(); // Re-fetch data to update UI
-            } else {
+            if (!hasChanges) {
                 displayMessage('No changes to save.', 'info');
+                return;
             }
+
+            const response = await fetch(WORKER_URL, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(payload)
+            });
+
+            if (!response.ok) {
+                const errorText = await response.text();
+                throw new Error(`Server responded with error: ${response.status} - ${errorText}`);
+            }
+
+            const result = await response.json();
+            displayMessage(result.message, 'success');
+            fetchData(); // Re-fetch data to update UI
 
         } catch (error) {
             console.error('Error saving device changes:', error);
@@ -191,22 +206,6 @@ document.addEventListener('DOMContentLoaded', () => {
             loadingSpinner.style.display = 'none';
         }
     });
-
-    async function sendUpdate(payload) {
-        const response = await fetch(WORKER_URL, {
-            method: 'PUT',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify(payload)
-        });
-
-        if (!response.ok) {
-            const errorText = await response.text();
-            throw new Error(`Server responded with error: ${response.status} - ${errorText}`);
-        }
-        return response.json();
-    }
 
     function formatLastSeen(timestamp) {
         if (!timestamp) return 'N/A';
@@ -221,17 +220,19 @@ document.addEventListener('DOMContentLoaded', () => {
         if (diffHours < 24) return `${diffHours} hours ago`;
         const diffDays = Math.floor(diffHours / 24);
         if (diffDays < 30) return `${diffDays} days ago`;
-        // Fallback to absolute date if too old
-        return date.toLocaleString();
+        if (diffDays < 365) return `${Math.floor(diffDays / 30)} months ago`;
+        return `${Math.floor(diffDays / 365)} years ago`;
     }
 
     function displayMessage(message, type) {
-        errorMessage.className = `alert alert-${type} error-message`;
-        errorMessage.textContent = message;
-        errorMessage.style.display = 'block';
-        // Hide message after a few seconds
+        errorMessage.style.display = 'none';
+        successMessage.style.display = 'none';
+        const targetMessageElement = type === 'success' ? successMessage : errorMessage;
+        targetMessageElement.textContent = message;
+        targetMessageElement.style.display = 'block';
+
         setTimeout(() => {
-            errorMessage.style.display = 'none';
+            targetMessageElement.style.display = 'none';
         }, 5000);
     }
 });
